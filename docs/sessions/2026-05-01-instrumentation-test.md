@@ -141,21 +141,47 @@ Closes the Phase 1 / ADR-0010 verification gap.
   `androidxTestRunner = "1.6.2"` plus an `androidx-test-runner`
   library alias (no other artifact pulled it in transitively).
 
-**Failure-mode verification**
+**Library bug the test caught (and fixed)**
 
-Per the brief's DoD, the test was hand-verified to fail when ADR-0010's
-wrap is removed. Recipe (do not commit the revert):
+First device run failed not on assertion #1 but with a `StrictMode
+ThreadPolicy violation` originating in
+`ResumableUploadEngine.extractWebViewLink` and the implicit
+`Response.close()` performed by `.use { }` on a 200 chunk response.
+Root cause: the engine's old `executeAsync(req)` helper switched to
+IO only for `httpClient.newCall(req).execute()` and resumed on the
+caller's dispatcher (Main, in production `viewModelScope` collection).
+The surrounding `.use { resp -> classifyChunkResponse(resp) }` block
+ran on Main, drained remaining socket bytes via
+`Response.peekBody().string()` (200 path) and via the implicit
+`Response.close()` `.use { }` performs, and tripped StrictMode.
+ADR-0010 only enumerated the `UploadInitiator.initiate` path; this is
+the same defensive policy applied to chunk-PUT response handling,
+missed in the original ADR.
 
-1. In `android/library/src/main/kotlin/.../internal/DriveUploaderImpl.kt`,
-   change `withContext(Dispatchers.IO) { initiator.initiate(request, 1) }`
-   to `initiator.initiate(request, 1)` inside `obtainSession`.
-2. `./gradlew :library:connectedDebugAndroidTest` — test fails because
-   the synchronous OkHttp inside `initiate` runs on Main and StrictMode
-   raises `NetworkOnMainThreadException`; the library catches it as
-   `UploadError.InitiateFailed` and emits `Failed` instead of
-   `Succeeded`.
-3. Restore the `withContext(Dispatchers.IO)` wrap.
-4. Re-run — green.
+Fix: replace `executeAsync` with a block-taking
+`withResponseOnIO(req) { resp -> ... }` that runs the entire request +
+response handling + close inside `runInterruptible(Dispatchers.IO)`.
+Two call sites updated (`queryServerOffset`, `putChunkWithRetries`).
+JVM unit tests still pass; instrumentation test now green.
+
+**Failure-mode verification (per brief DoD)**
+
+With the library fix in place, the ADR-0010 wrap on
+`UploadInitiator.initiate` was hand-verified as load-bearing:
+
+1. Removed `withContext(Dispatchers.IO)` wrap from
+   `DriveUploaderImpl.obtainSession`'s live-initiate path.
+2. `./gradlew :library:connectedDebugAndroidTest` — `BUILD FAILED`.
+   Test fails on assertion #1 with `terminal=Failed(InitiateFailed)`
+   and `emissions=[Initiating(1), Failed(InitiateFailed)]`. StrictMode
+   caught the sync OkHttp inside the fake initiator; library surfaced
+   `InitiateFailed` per its existing catch.
+3. Restored the wrap. Re-ran — green.
+
+Four runs total: red (library bug surfaced) → green (after fix) → red
+(ADR-0010 wrap removed) → green (wrap restored). The test
+demonstrably catches the bug class it was designed for, and surfaced
+a sibling bug the original ADR missed.
 
 **Out of scope (unchanged from brief)**
 

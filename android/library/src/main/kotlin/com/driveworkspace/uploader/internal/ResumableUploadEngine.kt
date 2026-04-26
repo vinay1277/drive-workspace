@@ -120,7 +120,7 @@ internal class ResumableUploadEngine(
             .put(EmptyBody)
             .build()
         return try {
-            executeAsync(req).use { resp ->
+            withResponseOnIO(req) { resp ->
                 when {
                     resp.code == 308 -> OffsetQuery.Incomplete(parseRangeUpper(resp.header("Range")) + 1)
                     resp.isSuccessful -> OffsetQuery.Complete(extractWebViewLink(resp))
@@ -163,7 +163,7 @@ internal class ResumableUploadEngine(
                 .put(body)
                 .build()
             val outcome: ChunkResult = try {
-                executeAsync(req).use { resp -> classifyChunkResponse(resp) }
+                withResponseOnIO(req) { resp -> classifyChunkResponse(resp) }
             } catch (e: IOException) {
                 ChunkResult.Failed(UploadError.NetworkUnavailable())
             }
@@ -193,12 +193,29 @@ internal class ResumableUploadEngine(
         else -> ChunkResult.Failed(UploadError.Http4xx(resp.code, resp.peekBody(MAX_ERR_BODY).string()))
     }
 
-    // runInterruptible(EmptyCoroutineContext) inherits the caller's dispatcher.
-    // The flow is collected on the host's chosen dispatcher (typically Main via
-    // viewModelScope), so we MUST switch to IO ourselves — sync OkHttp on Main
-    // is a NetworkOnMainThreadException via Android's StrictMode policy.
-    private suspend fun executeAsync(req: Request): Response =
-        runInterruptible(Dispatchers.IO) { httpClient.newCall(req).execute() }
+    /**
+     * Execute [req] and run [block] against the [Response] entirely on
+     * `Dispatchers.IO`, including the implicit `Response.close()` that
+     * `.use { … }` performs.
+     *
+     * This is stricter than the historical `executeAsync` helper, which
+     * only forced `httpClient.newCall(req).execute()` onto IO and
+     * resumed on the caller's dispatcher (Main, in production
+     * `viewModelScope` collection). That left subsequent body-reading
+     * calls — `Response.peekBody().string()`, `extractWebViewLink`,
+     * the `.use { }` block's `close()` — running on the caller's
+     * dispatcher; on Main, those drain remaining socket bytes and
+     * trigger `NetworkOnMainThreadException` via Android's StrictMode.
+     * The Phase 3 instrumentation test caught this; ADR-0010 covers
+     * `UploadInitiator.initiate` symmetrically and this is the same
+     * defensive policy applied to chunk-PUT response handling.
+     */
+    private suspend fun <R> withResponseOnIO(
+        req: Request,
+        block: (Response) -> R,
+    ): R = runInterruptible(Dispatchers.IO) {
+        httpClient.newCall(req).execute().use(block)
+    }
 
     /** Parses a Drive-style `Range: bytes=0-N` header, returning N. Returns -1 if absent/malformed. */
     private fun parseRangeUpper(header: String?): Long {
