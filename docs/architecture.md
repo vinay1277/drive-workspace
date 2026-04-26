@@ -208,6 +208,7 @@ from drive_workspace import DriveWorkspace, FileSpec, Authenticator
 dw = DriveWorkspace(
     auth=Authenticator.from_file("/secrets/drive-sa.json"),
     root_folder_id="0AB...",
+    shared_drive_id="0AS...",          # ADR-0011: every Drive call carries this
     template_folder_id="1tpl...",
     template_spreadsheet_id="1tps...",
     principal_store=MyPrincipalStore(db),

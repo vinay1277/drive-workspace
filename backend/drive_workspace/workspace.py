@@ -31,13 +31,20 @@ class DriveWorkspace:
         self,
         auth: Authenticator,
         root_folder_id: str,
+        shared_drive_id: str,
         template_folder_id: str,
         template_spreadsheet_id: str,
         principal_store: PrincipalStore,
         log_schema: LogSchema,
     ) -> None:
+        if not shared_drive_id or not shared_drive_id.strip():
+            raise ValueError(
+                "shared_drive_id must be a non-empty string "
+                "(see ADR-0011: every Drive call needs the Shared Drive id)"
+            )
         self.auth = auth
         self.root_folder_id = root_folder_id
+        self.shared_drive_id = shared_drive_id
         self.template_folder_id = template_folder_id
         self.template_spreadsheet_id = template_spreadsheet_id
         self.principal_store = principal_store
