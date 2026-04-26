@@ -43,6 +43,12 @@ drive-workspace/
 3. [`docs/plan.md`](docs/plan.md) — current phase + task list
 4. [`docs/sessions/`](docs/sessions/) — find the brief for the task you're picking up
 
+## Day-to-day workflow
+
+[`docs/operating-guide.md`](docs/operating-guide.md) is the practical guide
+for running this project session by session — how to start a session, what
+to watch for, how to verify done-ness, how to write briefs.
+
 ## License
 
 Proprietary. In-house use only. See [`LICENSE`](LICENSE).

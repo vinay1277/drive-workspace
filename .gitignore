@@ -63,3 +63,6 @@ Desktop.ini
 *.swp
 *.swo
 *~
+
+# Claude Code working directories
+.claude/
