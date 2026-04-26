@@ -6,19 +6,29 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 /**
- * Library-owned Room database. Encapsulated entirely inside the module — the
- * host app does not see this type and must not share it with its own DB.
+ * Library-owned Room database. Encapsulated entirely inside the module —
+ * the host app does not see this type and must not share it with its own
+ * DB.
  *
- * Ships exactly one table ([CheckpointEntity]). If/when we need more
- * (e.g. a queue), a new entity goes here.
+ * Schema history:
+ *  - v1: [CheckpointEntity] only.
+ *  - v2: + [BankedSessionEntity] (ADR-0003 prefetch bank).
+ *
+ * Pre-v0.1.0 we ship a destructive migration via
+ * `fallbackToDestructiveMigration`. Real migration discipline kicks in
+ * at v1.0; for now, a schema bump nukes the local DB and the host app
+ * re-runs any in-flight upload from scratch (the host always has the
+ * source file on disk; checkpoints are an optimisation, not a source
+ * of truth).
  */
 @Database(
-    entities = [CheckpointEntity::class],
-    version = 1,
+    entities = [CheckpointEntity::class, BankedSessionEntity::class],
+    version = 2,
     exportSchema = false,
 )
 internal abstract class DriveUploadDatabase : RoomDatabase() {
     abstract fun checkpointDao(): CheckpointDao
+    abstract fun bankedSessionDao(): BankedSessionDao
 
     companion object {
         private const val DB_NAME = "drive_uploader.db"
@@ -31,7 +41,10 @@ internal abstract class DriveUploadDatabase : RoomDatabase() {
                     context.applicationContext,
                     DriveUploadDatabase::class.java,
                     DB_NAME,
-                ).build().also { instance = it }
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+                    .also { instance = it }
             }
     }
 }
