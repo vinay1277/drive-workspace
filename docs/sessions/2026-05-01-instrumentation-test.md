@@ -98,6 +98,69 @@ Do not read prior session transcripts.
 
 ## Outcome
 
-> Filled in at end of session.
+Single instrumentation test added at
+`android/library/src/androidTest/kotlin/com/driveworkspace/uploader/MainDispatcherInstrumentationTest.kt`.
+Closes the Phase 1 / ADR-0010 verification gap.
 
-(blank — to be completed)
+**What the test does**
+
+- `MockWebServer` in the test process answers two calls in order: the
+  initiator's POST to `/initiate` (200 `{}`) and the engine's single
+  chunk PUT to `/upload-session/abc` (200 with a Drive-shaped JSON
+  body). 8 KB temp file fits inside one 1 MB chunk so there is no
+  resume / no offset query.
+- The fake `UploadInitiator` runs **synchronous OkHttp** with no
+  defensive `withContext` of its own — exactly the host-impl shape
+  ADR-0010 was written to protect. It records
+  `Thread.currentThread().name` at call time.
+- The Flow is collected via `runBlocking(Dispatchers.Main) {
+  uploader.upload(...).toList() }` so the upload coroutine starts on
+  the real Android Main looper.
+- `@Before` installs a deterministic
+  `StrictMode.ThreadPolicy.detectNetwork().penaltyDeath()` on Main —
+  some instrumentation runners ship a permissive default and would
+  let a broken library succeed silently. `@After` resets to LAX.
+
+**Assertions**
+
+1. Terminal emission is `UploadProgress.Succeeded`.
+2. Recorded initiator thread name is not `"main"` and does not start
+   with `"main "` (belt-and-suspenders if a future change loosens
+   StrictMode but the wrap is still missing).
+3. Server saw exactly 2 requests (initiate + single chunk PUT).
+
+**Build wiring**
+
+- `android/library/build.gradle.kts`: added
+  `defaultConfig.testInstrumentationRunner =
+  "androidx.test.runner.AndroidJUnitRunner"` and an
+  `androidTestImplementation` dependency block (junit, androidx.junit,
+  androidx.test.runner, okhttp.mockwebserver,
+  kotlinx-coroutines-android, kotlinx-coroutines-test).
+- `android/gradle/libs.versions.toml`: added
+  `androidxTestRunner = "1.6.2"` plus an `androidx-test-runner`
+  library alias (no other artifact pulled it in transitively).
+
+**Failure-mode verification**
+
+Per the brief's DoD, the test was hand-verified to fail when ADR-0010's
+wrap is removed. Recipe (do not commit the revert):
+
+1. In `android/library/src/main/kotlin/.../internal/DriveUploaderImpl.kt`,
+   change `withContext(Dispatchers.IO) { initiator.initiate(request, 1) }`
+   to `initiator.initiate(request, 1)` inside `obtainSession`.
+2. `./gradlew :library:connectedDebugAndroidTest` — test fails because
+   the synchronous OkHttp inside `initiate` runs on Main and StrictMode
+   raises `NetworkOnMainThreadException`; the library catches it as
+   `UploadError.InitiateFailed` and emits `Failed` instead of
+   `Succeeded`.
+3. Restore the `withContext(Dispatchers.IO)` wrap.
+4. Re-run — green.
+
+**Out of scope (unchanged from brief)**
+
+- Other instrumentation tests (chunk PUT path, prefetch, etc.).
+- CI integration — runs locally on connected device for now.
+- Coverage tooling.
+- Production library code changes — none needed; the wrap is already
+  correct (commit `65fb192`).

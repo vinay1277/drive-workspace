@@ -12,6 +12,10 @@ android {
     defaultConfig {
         minSdk = 26
         consumerProguardFiles("consumer-rules.pro")
+        // Android instrumentation tests live under src/androidTest. The
+        // single instrumented test today is the ADR-0010 main-thread
+        // dispatcher check; see MainDispatcherInstrumentationTest.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -65,4 +69,14 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.junit)
     testImplementation(libs.robolectric)
+
+    // Android instrumentation tests (ADR-0010 main-thread dispatcher check).
+    // Run on a connected device/emulator via:
+    //   ./gradlew :library:connectedDebugAndroidTest
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.okhttp.mockwebserver)
+    androidTestImplementation(libs.kotlinx.coroutines.android)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }
