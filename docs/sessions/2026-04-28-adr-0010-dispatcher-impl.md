@@ -117,6 +117,46 @@ Do not read prior session transcripts.
 
 ## Outcome
 
-> Filled in at end of session.
+Landed as specified, single commit, on 2026-04-26.
 
-(blank — to be completed)
+- `DriveUploaderImpl.runUpload` now wraps `initiator.initiate(request)` in
+  `withContext(Dispatchers.IO) { ... }`. Imports added for
+  `kotlinx.coroutines.Dispatchers` and `kotlinx.coroutines.withContext`.
+- `UploadInitiator` KDoc gains the **Threading** paragraph (verbatim from
+  ADR-0010).
+- `BackendInitiator.initiate()` no longer carries its own
+  `withContext(Dispatchers.IO)` wrap; the now-unused
+  `kotlinx.coroutines.Dispatchers` / `withContext` imports are dropped, and
+  the body comment now references ADR-0010 instead of the bug-fix commit.
+- New unit test
+  `android/library/src/test/kotlin/com/driveworkspace/uploader/internal/DriveUploaderDispatcherTest.kt`
+  uses a fake `UploadInitiator` that records `Thread.currentThread().name`
+  and then throws to short-circuit the engine. The test collects the flow
+  via `runTest` (so the test scheduler — not IO — owns the flow body) and
+  asserts the recorded thread name starts with `"DefaultDispatcher-worker"`,
+  proving the library forced the IO hop. Includes a FIXME pointing at the
+  Phase 3 instrumentation test.
+
+Verification:
+
+- `./gradlew :library:testDebugUnitTest --tests
+  com.driveworkspace.uploader.internal.DriveUploaderDispatcherTest` →
+  passes.
+- `./gradlew :library:test :tester:assembleDebug` → BUILD SUCCESSFUL; no
+  pre-existing tests regressed (`ResumableUploadEngineTest`,
+  `RetryPolicyTest`, `LocalCheckpointStoreTest` all still green) and the
+  tester app still builds clean after the import cleanup.
+
+Open-question resolution from the brief:
+
+1. `kotlinx-coroutines-test` was already a `testImplementation` dep in
+   `android/library/build.gradle.kts` — no dep change needed.
+2. The chunk-PUT dispatcher assertion was deliberately *not* added; only a
+   one-line FIXME points to a Phase 3 instrumentation test, per the brief.
+3. No existing test was disturbed by the auto-dispatch — the engine tests
+   are scoped to `ResumableUploadEngine`, which already runs its own
+   `runInterruptible(Dispatchers.IO)`.
+
+Plan delta: the ADR-0010 application bullet is removed from
+`docs/plan.md` "Open work outside the phase plan"; the Phase 3
+instrumentation-test bullet remains.
