@@ -165,19 +165,68 @@ Phase 1 skeleton landed in four logical commits:
 ### Verified
 
 - `python -m ruff check .` and `python -m mypy --strict drive_workspace/`
-  in `backend/` are both clean.
+  in `backend/` — clean.
+- `pip install -e .[dev,flask]` succeeds. Flask server boots.
+- `curl /health` → `{"status":"ok"}`.
+- `curl POST /api/drive/initiate-upload` returns a valid session JSON
+  with `upload_url`, `drive_file_id`, `expires_at`.
+- Chunked `PUT /_stub/upload/<id>` end-to-end: first chunk (`Content-Range:
+  bytes 0-999/2000`) returns `308 PERMANENT REDIRECT` with `Range:
+  bytes=0-999`; final chunk returns `200 OK` with
+  `{"id":"fake-...","webViewLink":null}`. This is exactly what the Android
+  library's resumable engine PUTs against, so the wire path is proven.
+- `./gradlew :tester:assembleDebug` — `BUILD SUCCESSFUL` (after the fixups
+  noted below). APK lands at
+  `android/tester/build/outputs/apk/debug/tester-debug.apk` (~12 MB).
+- `./gradlew :library:testDebugUnitTest` — `BUILD SUCCESSFUL`. The ported
+  Robolectric/JUnit tests for `LocalCheckpointStore`,
+  `ResumableUploadEngine`, and `RetryPolicy` all pass under the renamed
+  `com.driveworkspace.uploader` package.
+- Android emulator (AVD `drive_test`, system-images;android-35;google_apis,
+  WHPX accel) booted headless. `adb install -r tester-debug.apk` →
+  `Success`. `pm list packages` shows `com.driveworkspace.tester`. Verified
+  the emulator can reach the host's reference server at `10.0.2.2:8080`
+  (a malformed TCP test triggered Flask's HTML 400 page — proves routing).
+- `am start -n com.driveworkspace.tester/.MainActivity`: `Displayed ... +3s`.
+  `dumpsys activity activities` confirms `topResumedActivity = MainActivity`.
+  No FATAL/AndroidRuntime entries in logcat.
 
-### Not verified by this session (require dev environment)
+### Fixups uncovered by running the build (committed)
 
-- `docker compose up` end-to-end (no Docker invoked; compose file is
-  written but not executed).
-- `./gradlew :tester:assembleDebug` / `:tester:installDebug` (no Android
-  SDK / device available in this session).
-- The full tap-Upload-see-Succeeded loop on a real emulator.
+- `compileSdk` and `targetSdk` 35 → 36 in both modules. The androidx
+  versions in the trimmed `libs.versions.toml`
+  (`core-ktx 1.17.0`, `activity 1.11.0`, `lifecycle 2.9.4`) require API 36;
+  AGP 8.12 fails fast on the AAR metadata mismatch. Build-tools 36 and
+  `platforms;android-36` are already what's installed, so this is a no-op
+  on the dev side.
+- `:tester` build.gradle.kts: enabled `isCoreLibraryDesugaringEnabled` and
+  added the `coreLibraryDesugaring(libs.android.desugar.jdk.libs)` dep —
+  required because `:library` consumes desugared APIs and AGP enforces
+  app-side opt-in.
+- Restored `androidx.test.ext:junit` (`androidx-junit`) in
+  `libs.versions.toml`; the ported `LocalCheckpointStoreTest` uses
+  `@RunWith(AndroidJUnit4::class)`. It got dropped during the initial trim
+  because the original SmartMeter library `build.gradle.kts` doesn't list
+  it (presumably it never compiled cleanly there either).
 
-These are the runtime checks in the Definition of Done; the next person to
-boot this on a dev box should walk through them. If anything fails, log the
-fix in a follow-up session brief rather than amending this one.
+### Not verified by this session
+
+- **`docker compose up`**. Docker Desktop install via `winget install
+  Docker.DockerDesktop` requires admin elevation (UAC prompt) that this
+  non-interactive shell cannot satisfy — installer exits with the
+  Win32 elevation error code. WSL2 distro install has the same elevation
+  wall. The compose file itself is straightforward (postgres healthcheck +
+  reference_server build); next dev to launch Docker Desktop interactively
+  should be able to `docker compose up` and re-run the same `/health` and
+  `/api/drive/initiate-upload` curl checks against `localhost:8080`.
+- **The UI tap-Upload-see-Succeeded loop in the running app**. The tester
+  uses an `ACTION_OPEN_DOCUMENT` system picker which is impractical to
+  drive headlessly via `adb shell input`. Everything underneath the UI tap
+  is verified independently above; the manual smoke test on a real device
+  is a one-minute confirmation step for whoever runs it next.
+
+If either of the unverified items trips, log it in a follow-up session
+brief — not as an amendment to this one.
 
 ### Notes for the next session
 
