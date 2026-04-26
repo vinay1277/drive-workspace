@@ -98,7 +98,11 @@ Not started. Depends on v0.1.0. Out of scope until the maturity checklist is met
 ## Open work outside the phase plan
 
 - ADR review pass: read all ADRs after Phase 2; supersede any that didn't survive contact with reality.
-- Phase 3 task seeded by ADR-0010: add an Android instrumentation test that exercises the full upload path with the flow collected on `Dispatchers.Main`. JVM-only unit tests cannot catch main-thread-network bugs; the gap was visible in Phase 1.
+- Phase 3 task seeded by ADR-0010: add an Android instrumentation test that exercises the full upload path with the flow collected on `Dispatchers.Main`. JVM-only unit tests cannot catch main-thread-network bugs; the gap was visible in Phase 1. **(Closed in `2026-05-01-instrumentation-test`; commit `f4ec286` ships the test, `43f3611` fixes the chunk-PUT response-handling bug it surfaced.)**
+- **Phase 2B prerequisite (seeded by `2026-05-03-smartmeter-integration-sketch`)**: ship `drive_workspace.adapters.flask.make_blueprint(dw, auth_decorator)` so hosts don't hand-wire the routes. The SmartMeter sketch hand-wires today (~50 lines of glue); after this lands the host glue collapses to one `register_blueprint(...)` call. URL prefix and JSON shapes are pinned by `docs/BACKEND_CONTRACT.md`.
+- **Phase 2B prerequisite (same brief)**: thread `shared_drive_id: str` through `DriveWorkspace.__init__` so ADR-0011's Shared-Drives choice has a constructor surface. The current stub predates ADR-0011 and accepts only `root_folder_id` / template ids. Phase 2B's `FolderManager.provision` and `UploadSessionMint.initiate` need this id to set `supportsAllDrives=True` and parent folders inside the Shared Drive.
+- **Phase 3 documentation task (same brief)**: per-host `TypedDict` for `LogSchema.render_row` payload. The contract is documented per host today (see `SmartMeterLogSchema` docstring) but not statically checked at the call site. A `TypedDict` declared by the host in their `LogSchema` module would give mypy something to verify — small change, no package-side work.
+- **Phase 4 nice-to-have (same brief)**: ship a `drive_workspace.migrations` helper module with the recommended `ALTER TABLE ... ADD COLUMN drive_*` SQL parameterised by table/PK type, so the second consumer doesn't re-derive it from the SmartMeter sketch.
 
 ## Notes for whoever picks up the next session
 

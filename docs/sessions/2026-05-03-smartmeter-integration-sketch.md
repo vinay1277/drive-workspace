@@ -149,6 +149,65 @@ Do not read prior session transcripts.
 
 ## Outcome
 
-> Filled in at end of session.
+Sketch directory `integration-tests/smartmeter/` ships five files
+plus a findings README. Each Python file imports cleanly with only
+`drive_workspace` on `PYTHONPATH` (no SmartMeter); `mypy --strict`
+clean across all five (`Success: no issues found in 5 source
+files`); `ruff check` clean.
 
-(blank — to be completed)
+**Files**
+
+| File                              | Lines | What it does |
+|-----------------------------------|-------|-------------|
+| `__init__.py`                     | 10    | Package marker + scope disclaimer. |
+| `smartmeter_principal_store.py`   | 137   | `PrincipalStore` impl over `SmartMeter.surveyors`; `surveyor_id` BIGINT cast to `str` at the Protocol boundary. Migration SQL embedded in module docstring. |
+| `smartmeter_log_schema.py`        | 79    | `LogSchema` impl with the 9 columns the brief specified; `_hyperlink` helper renders `=HYPERLINK(...)` formula cells with quote escaping. |
+| `smartmeter_authenticator.py`     | 73    | `build_authenticator()` resolves `DRIVE_WORKSPACE_SA_KEY_PATH` env var with the existing `verticals/gmail/credentials/` fallback. Per ADR-0011 (Shared Drives) no DWD `subject` plumbing — `FileAuthenticator` unmodified. |
+| `flask_glue_sketch.py`            | 148   | Hand-wired blueprint with two routes (`/api/drive/initiate-upload` and `/submission`) wrapped by `core.surveyor_auth.require_surveyor_auth`. Placeholder stubs for SmartMeter symbols so the file imports without SmartMeter on the path. |
+| `README.md`                       | —     | Findings, line counts, gaps, migration notes. |
+
+**Confirmed**
+
+- `surveyor_id` → `principal_id` (str cast) is clean.
+- Raw-SQL pattern coexists with drive_workspace's Protocol typing
+  without forcing SQLAlchemy on the host.
+- JWT middleware (`require_surveyor_auth`) decorates the blueprint
+  view functions cleanly; drive_workspace itself never sees the
+  token.
+- ADR-0011's Shared-Drives choice is operationally lighter than DWD
+  for SmartMeter (no `subject`, single credentials directory).
+- `SmartMeterLogSchema.render_row` produces HYPERLINK formula cells
+  matching the column shape `survey_management/routes_restx.py`
+  already produces; no payload reshape needed at the host call site.
+
+**Gaps surfaced (now in `plan.md` "Open work outside the phase plan")**
+
+1. `drive_workspace.adapters.flask.make_blueprint(dw, auth_decorator)`
+   doesn't exist yet (Phase 2A left `adapters/flask.py` as a stub).
+   Sketch hand-wires routes; once `make_blueprint` ships, host glue
+   drops by ~50 lines.
+2. `DriveWorkspace.__init__` predates ADR-0011 and lacks
+   `shared_drive_id`. Phase 2B needs to thread it through (and the
+   matching `supportsAllDrives=True` flag at every Drive API call
+   site, per ADR-0011's Implementation notes).
+3. `LogSchema.render_row(payload)` lacks a `TypedDict` per host
+   for the input dict — runtime contract today, no static check.
+   Phase 3 documentation task.
+4. No `drive_workspace.migrations` helper for the host's
+   `ALTER TABLE ... ADD COLUMN drive_*` SQL. Each host re-derives;
+   small win for the second consumer to ship.
+
+**Surprise (minor)**
+
+- `docs/architecture.md` §8 sketches the public API as
+  `dw.principals.provision(...)` while the code wires
+  `dw.principals = FolderManager(self)`. They agree but the naming
+  asymmetry reads confusing at first contact.
+
+**Out of scope (per brief, unchanged)**
+
+- No SmartMeter imported for real; symbols are hand-translated.
+- No data migration (Phase 4 problem).
+- No Android-side SmartMeter changes (also Phase 4).
+- `make_blueprint` was sketched as a hand-wired blueprint per the
+  brief's "if absent, sketch hand-wired routes" guidance.
