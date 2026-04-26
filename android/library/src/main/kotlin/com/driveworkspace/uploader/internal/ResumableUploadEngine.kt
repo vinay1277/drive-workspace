@@ -4,6 +4,7 @@ import com.driveworkspace.uploader.api.DriveUploaderConfig
 import com.driveworkspace.uploader.api.UploadError
 import com.driveworkspace.uploader.api.UploadSession
 import com.driveworkspace.uploader.internal.checkpoint.LocalCheckpointStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runInterruptible
 import okhttp3.MediaType.Companion.toMediaType
@@ -192,8 +193,12 @@ internal class ResumableUploadEngine(
         else -> ChunkResult.Failed(UploadError.Http4xx(resp.code, resp.peekBody(MAX_ERR_BODY).string()))
     }
 
+    // runInterruptible(EmptyCoroutineContext) inherits the caller's dispatcher.
+    // The flow is collected on the host's chosen dispatcher (typically Main via
+    // viewModelScope), so we MUST switch to IO ourselves — sync OkHttp on Main
+    // is a NetworkOnMainThreadException via Android's StrictMode policy.
     private suspend fun executeAsync(req: Request): Response =
-        runInterruptible { httpClient.newCall(req).execute() }
+        runInterruptible(Dispatchers.IO) { httpClient.newCall(req).execute() }
 
     /** Parses a Drive-style `Range: bytes=0-N` header, returning N. Returns -1 if absent/malformed. */
     private fun parseRangeUpper(header: String?): Long {
