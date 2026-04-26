@@ -38,6 +38,20 @@ internal class DriveUploaderImpl(
         }
     }
 
+    override suspend fun prefetchSessions(
+        count: Int,
+        requestTemplate: UploadRequest,
+    ): Int {
+        // Real implementation lands in the bank-wiring commit; for now this stub
+        // keeps the public surface compilable without behaviour change for
+        // hosts that haven't started using prefetch yet.
+        Timber.tag(TAG).w(
+            "prefetchSessions called but bank wiring is not yet enabled (count=%d)",
+            count,
+        )
+        return 0
+    }
+
     private fun runUpload(localFile: File, request: UploadRequest): Flow<UploadProgress> = flow {
         if (!localFile.exists()) {
             emit(UploadProgress.Failed(UploadError.FileMissing(), isRetryable = false))
@@ -48,7 +62,11 @@ internal class DriveUploaderImpl(
             initAttempt++
             emit(UploadProgress.Initiating(initAttempt))
             val session = try {
-                withContext(Dispatchers.IO) { initiator.initiate(request) }
+                val sessions = withContext(Dispatchers.IO) { initiator.initiate(request, 1) }
+                check(sessions.isNotEmpty()) {
+                    "UploadInitiator.initiate returned empty list for count=1"
+                }
+                sessions.first()
             } catch (t: Throwable) {
                 Timber.tag(TAG).w(t, "initiate failed")
                 emit(UploadProgress.Failed(UploadError.InitiateFailed(t), isRetryable = true))

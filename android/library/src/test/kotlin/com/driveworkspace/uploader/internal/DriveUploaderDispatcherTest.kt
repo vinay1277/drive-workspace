@@ -38,7 +38,7 @@ class DriveUploaderDispatcherTest {
     @Test
     fun `initiator runs on a non-main IO thread`() = runTest {
         var observedThreadName: String? = null
-        val initiator = UploadInitiator { _: UploadRequest ->
+        val initiator = UploadInitiator { _: UploadRequest, _: Int ->
             observedThreadName = Thread.currentThread().name
             // Short-circuit so the engine's PUT path never runs in this unit test.
             error("initiate stop — observation done")
