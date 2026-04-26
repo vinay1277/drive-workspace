@@ -147,6 +147,96 @@ Do not read prior session transcripts.
 
 ## Outcome
 
-> Filled in at end of session.
+Phase 2A landed in five commits on branch `claude/elegant-lewin-aec701`:
 
-(blank — to be completed)
+1. **`feat(auth): FileAuthenticator default impl + tests`** —
+   `backend/drive_workspace/auth.py` with module-level `SCOPES =
+   ("…/auth/drive", "…/auth/spreadsheets")`, commented for why each is
+   needed. `FileAuthenticator(key_path)` resolves and existence-checks
+   the path at construction (fail-fast on misconfigured deploys);
+   `credential()` delegates to
+   `Credentials.from_service_account_file(..., scopes=list(SCOPES))`.
+   Tests mock `from_service_account_file` so they don't need a real RSA
+   key; structural Protocol compatibility against
+   `workspace.Authenticator` is asserted.
+2. **`feat(stores): default SqlAlchemyPrincipalStore + tests`** —
+   `backend/drive_workspace/stores/sqlalchemy.py` with
+   `Base(DeclarativeBase)`, `Principal` model (`principal_id` PK,
+   `folder_id`, `spreadsheet_id`, `display_name?`, `granted_email?`,
+   `provisioned_at`, `revoked_at?`), `create_all(engine)` helper, and
+   `SqlAlchemyPrincipalStore(sessionmaker[Session])`. Store opens its
+   own short-lived session per call. `record_provisioned` is idempotent
+   (re-provision refreshes ids and clears `revoked_at`).
+   `record_revoked` no-ops on unknown principals. Always-on SQLite
+   tests cover the full Protocol surface (provision, idempotent
+   re-provision, revoke, revoke-then-reprovision, multi-principal
+   isolation, no-op revoke). Postgres-backed test class is gated by the
+   `DRIVE_WS_POSTGRES_URL` env var (skipped by default — keeps the
+   plain `pytest` invocation Docker-free).
+3. **`feat(logs): formalize LogSchema Protocol with ColumnSpec + reference impl`** —
+   `ColumnSpec(key, header)` value object; `LogSchema.columns()` now
+   returns `list[ColumnSpec]` (was `list[str]`); `render_row` invariant
+   is "same length and order as columns()". `ExampleLogSchema`
+   (timestamp + principal_id + note + photo_link) lives under
+   `tests/_fixtures/example_log_schema.py` so it does not pollute the
+   package's importable surface. `__init__.py` re-exports `ColumnSpec`,
+   `LogSchema`, and `FileAuthenticator`. `SpreadsheetLogger.append`
+   still raises `NotImplementedError("Phase 2B")`.
+4. **`ci: drop exit-5 pytest workaround now that real tests exist`** —
+   `.github/workflows/backend-ci.yml` Pytest step is now a plain
+   `pytest`.
+5. **`docs(phase-2a): close session brief and mark plan tasks done`** —
+   this commit. `plan.md` tasks 2.2 (file-path Authenticator), 2.6
+   (CRUD-only, no Alembic), and 2.7 (Protocol + reference impl, no
+   Sheets `append` yet) marked done; tasks 2.3, 2.4, 2.5, 2.9 stay
+   "not started" pending ADR-0008.
+
+### Decisions taken inline (per brief's open questions)
+
+- **N1 — session lifecycle**: store takes a `sessionmaker[Session]` and
+  opens its own session per call. Matches the brief's recommendation.
+- **N2 — Principal columns vs. Protocol**: `PrincipalStore` Protocol
+  stays opaque; the SQLAlchemy `Principal` model is an impl detail.
+  `display_name` and `granted_email` ship nullable for now since the
+  current Protocol does not carry them — a future session can widen
+  the Protocol when `FolderManager.provision()` lands.
+- **N3 — Postgres test gating**: env-var-driven via
+  `DRIVE_WS_POSTGRES_URL`. Default `pytest` requires no Docker.
+- **N4 — google-auth pin**: kept at `>=2.30` with no upper bound.
+
+### Verified
+
+- `python -m ruff check drive_workspace/` — clean.
+- `python -m mypy --strict drive_workspace/` — clean (18 source files).
+- `python -m pytest drive_workspace/tests/` — 17 passed, 1 skipped
+  (the postgres class). Postgres class was not run in this session;
+  Docker Desktop install on the dev box is still deferred from Phase 1.
+  Re-running with `docker compose up -d postgres` and
+  `DRIVE_WS_POSTGRES_URL=postgresql+psycopg://dev:dev@localhost:5432/dev`
+  exercises the same `_store_contract` path against real Postgres.
+- Reference Flask server unchanged: Phase 1 stub endpoints still serve
+  per the brief's "Out of scope" list.
+
+### Not verified by this session
+
+- **Postgres-backed store tests**. Docker-gated; not run here. Code
+  path is identical to the verified SQLite path apart from the engine
+  URL and the `DROP TABLE IF EXISTS` setup/teardown around
+  `Base.metadata.create_all`.
+- **CI run on GitHub Actions**. The workflow change is a strict
+  simplification (drop the exit-5 swallow); locally everything is
+  green.
+
+### Notes for the next session (Phase 2B)
+
+- ADR-0008 (test Workspace ownership) needs to land before
+  `FolderManager.provision`, `UploadSessionMint.initiate`, or
+  `SpreadsheetLogger.append` get real implementations.
+- When `FolderManager.provision` lands and starts persisting
+  `display_name` + `granted_email`, widen the `PrincipalStore`
+  Protocol's `record_provisioned` signature in the same session — the
+  default impl's columns are already there, but no other impl can
+  populate them through the Protocol surface today.
+- ADR-0010 (library dispatcher discipline) does not gate Phase 2A but
+  must be resolved before any session that touches
+  `DriveUploaderImpl`.
