@@ -193,6 +193,59 @@ location.
 
 ## Outcome
 
-> Filled in at end of session.
+Both Phase 2B prerequisites landed. The SmartMeter sketch was
+updated end-to-end and now uses the real `make_blueprint`, proving
+the gaps closed.
 
-(blank — to be completed)
+**Shipped (3 commits)**
+
+1. `feat(workspace): add shared_drive_id to DriveWorkspace constructor`
+   — new parameter after `root_folder_id`, validated non-empty
+   (rejects `""` and whitespace) → `ValueError`. Stored as public
+   `self.shared_drive_id`. New `backend/drive_workspace/tests/test_workspace.py`
+   covers the validation. `docs/architecture.md` §8 sketch updated.
+2. `feat(adapters): ship drive_workspace.adapters.flask.make_blueprint`
+   — full impl mounting `POST {url_prefix}/initiate-upload[?count=N]`
+   and `POST {url_prefix}/submission` per `BACKEND_CONTRACT.md`.
+   Default `url_prefix=/api/drive`. Reads `principal_id` from
+   `flask.g.principal_id` (host contract). Optional `auth_decorator`
+   wraps both views. `MAX_PREFETCH_COUNT` moved to
+   `drive_workspace/__init__.py`; reference server re-exports for
+   import-path stability. `BACKEND_CONTRACT.md` updated. New
+   `test_flask_adapter.py` with 12 cases.
+3. `chore(integration-tests): swap SmartMeter sketch to make_blueprint`
+   — collapsed hand-wired blueprint to one
+   `register_blueprint(make_blueprint(dw, auth_decorator=...))` call;
+   threaded `shared_drive_id` from `required_env_vars()`. Sketch's
+   `flask_glue_sketch.py` dropped from 148 → 91 lines. README and
+   plan.md mark Gaps 1 and 2 closed.
+
+**Open questions resolved (per maintainer instruction "you take call")**
+
+1. `flask.g.principal_id` is the contract; documented in adapter
+   module docstring.
+2. `url_prefix` default is `/api/drive`.
+3. `MAX_PREFETCH_COUNT` lives in `drive_workspace/__init__.py`;
+   reference server imports + re-exports it.
+4. Blueprint never returns 401. 400 only for malformed `count`.
+   Missing `g.principal_id` is a host contract violation; surfaces
+   as Flask's default 500. A test (`test_missing_principal_id_surfaces_as_500`)
+   locks in that behaviour.
+
+**Verification**
+
+- `pytest backend/`: 56 passed, 1 skipped (38 prior + 6 new
+  `test_workspace.py` cases + 12 new `test_flask_adapter.py` cases).
+- `mypy --strict drive_workspace/`: clean (20 source files).
+- `mypy --strict integration-tests/smartmeter/` (run from
+  `backend/`): clean (5 source files).
+- `ruff check .`: clean.
+
+**Out of scope (per brief, unchanged)**
+
+- `FolderManager.provision`, `UploadSessionMint.initiate`,
+  `SpreadsheetLogger.append` still raise `NotImplementedError` — Phase 2B.
+- Shared-Drive flag plumbing at Drive API call sites — Phase 2B.
+- FastAPI adapter — deferred until a host asks.
+- Gaps 3 (`LogSchema` payload `TypedDict`) and 4
+  (`drive_workspace.migrations`) remain open in `plan.md`.

@@ -19,7 +19,7 @@ against the actual shapes used in `D:\Python\Meter\SmartMeter_2\`:
 | `PrincipalStore`    | `SmartMeter.surveyors` (BIGINT `surveyor_id` PK, revision pattern, raw SQL via `core.database_manager.DatabaseManager`) | `smartmeter_principal_store.py`          |
 | `LogSchema`         | Per-survey-submission columns; HYPERLINK formulas to Drive media          | `smartmeter_log_schema.py`               |
 | `Authenticator`     | ADR-0011's Shared-Drives choice → unmodified `FileAuthenticator` + env-var | `smartmeter_authenticator.py`            |
-| Routes / blueprint  | Hand-wired (Phase 2A `make_blueprint` is a stub) under `core.surveyor_auth.require_surveyor_auth` JWT decorator | `flask_glue_sketch.py`                   |
+| Routes / blueprint  | `make_blueprint(dw, auth_decorator=...)` under `core.surveyor_auth.require_surveyor_auth` JWT decorator | `flask_glue_sketch.py`                   |
 
 All four files type-check under `mypy --strict` and pass `ruff check`
 with only `drive_workspace` installed (no SmartMeter on `PYTHONPATH`).
@@ -31,18 +31,16 @@ with only `drive_workspace` installed (no SmartMeter on `PYTHONPATH`).
 | `smartmeter_principal_store.py`   | 137         | 41                                               |
 | `smartmeter_log_schema.py`        | 79          | 37                                               |
 | `smartmeter_authenticator.py`     | 73          | 16                                               |
-| `flask_glue_sketch.py`            | 148         | 69                                               |
-| **Total**                         | **437**     | **~163**                                         |
+| `flask_glue_sketch.py`            | 91          | 35                                               |
+| **Total**                         | **380**     | **~129**                                         |
 
 The brief's architecture target is "~80 lines of host glue."
-`flask_glue_sketch.py` is heavier than that because it carries
-placeholder stubs for the four SmartMeter symbols
-(`DatabaseManager`, `require_surveyor_auth`, `get_surveyor_context`,
-plus the boot-wiring helper) that get **deleted** in production —
-replaced by direct imports from SmartMeter and one
-`make_blueprint(...)` line once Phase 2B ships that helper. Real
-production glue is ~120 lines. Within tolerance of the architecture
-target; not under it.
+`flask_glue_sketch.py` carries one placeholder
+(`_placeholder_require_principal_auth`) plus a `_placeholder_db()`
+stub that get **deleted** in production — replaced by SmartMeter's
+real decorator and `core.database_manager.DatabaseManager()`. Real
+production glue lands at ~70 code lines, comfortably under the
+architecture target.
 
 ## What was confirmed
 
@@ -82,29 +80,17 @@ target; not under it.
 
 These become tasks under `plan.md` "Open work outside the phase plan."
 
-### Gap 1 — `make_blueprint` doesn't exist yet
+### Closed in `2026-05-05-phase2b-prereqs`
 
-`drive_workspace/adapters/flask.py` is a one-line Phase 2 stub. The
-sketch hand-wires `Blueprint("drive_workspace", url_prefix="/api/drive")`
-with two routes; once `make_blueprint(dw, auth_decorator)` ships, the
-glue collapses to:
-
-```python
-from drive_workspace.adapters.flask import make_blueprint
-app.register_blueprint(make_blueprint(dw, auth_decorator=require_surveyor_auth))
-```
-
-That removes ~50 lines from the host and makes the wire contract
-(URL paths, JSON shapes) live in one place.
-
-### Gap 2 — `DriveWorkspace.__init__` lacks `shared_drive_id`
-
-ADR-0011 settled on Shared Drives. The Phase 2 stub
-`DriveWorkspace.__init__` was written before that ADR and takes
-`root_folder_id`, `template_folder_id`, `template_spreadsheet_id` —
-no `shared_drive_id`. Phase 2B will need to thread it through; the
-glue captures the env var via `required_env_vars()` and passes it
-along when the constructor grows the parameter.
+- **Gap 1 — `make_blueprint`.** Shipped in
+  `drive_workspace/adapters/flask.py`. The sketch's hand-wired
+  routes collapsed to one `register_blueprint(make_blueprint(dw,
+  auth_decorator=...))` call (~57 lines removed from
+  `flask_glue_sketch.py`).
+- **Gap 2 — `shared_drive_id`.** `DriveWorkspace.__init__` now takes
+  `shared_drive_id: str` (validated non-empty) per ADR-0011. The
+  glue's `required_env_vars()` already returned the env var; the
+  sketch now passes it through.
 
 ### Gap 3 — No host-migration helper
 
