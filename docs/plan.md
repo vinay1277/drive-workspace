@@ -21,14 +21,14 @@
 
 | # | Task | Owner | Depends on | Status |
 |---|------|-------|------------|--------|
-| 1.1 | Create `backend/drive_workspace/` package skeleton: empty modules (`workspace.py`, `folders.py`, `uploads.py`, `logs.py`, `reconcile.py`), `stores/`, `adapters/`, `__init__.py` re-exports. | next session | — | not started |
-| 1.2 | Create `backend/reference_server/`: minimal Flask app with `GET /health` and stub `POST /api/drive/initiate-upload` that returns a hard-coded fake session. | next session | 1.1 | not started |
-| 1.3 | `docker-compose.yml`: postgres 16 + reference_server. `docker compose up` works. | next session | 1.2 | not started |
-| 1.4 | Move `:core:drive` from SmartMeter V2 worktree → `android/library/`. Move `:sample:drive-tester` → `android/tester/`. Update package paths + Gradle settings. | next session | — | not started |
-| 1.5 | `android/gradle/libs.versions.toml` — copy / adapt from V2 worktree. | next session | 1.4 | not started |
-| 1.6 | Tester app: point default backend URL at the reference server (`10.0.2.2:8080` for emulator). Upload one file end-to-end against the stub server. | next session | 1.2, 1.4 | not started |
-| 1.7 | `.github/workflows/backend-ci.yml`: lint + test on push. (Android CI deferred to Phase 3.) | next session | 1.1 | not started |
-| 1.8 | `backend/README.md`: how to run locally, how to run tests. | next session | 1.1, 1.2, 1.3 | not started |
+| 1.1 | Create `backend/drive_workspace/` package skeleton: empty modules (`workspace.py`, `folders.py`, `uploads.py`, `logs.py`, `reconcile.py`), `stores/`, `adapters/`, `__init__.py` re-exports. | 2026-04-26 | — | done |
+| 1.2 | Create `backend/reference_server/`: minimal Flask app with `GET /health` and stub `POST /api/drive/initiate-upload` that returns a hard-coded fake session. | 2026-04-26 | 1.1 | done |
+| 1.3 | `docker-compose.yml`: postgres 16 + reference_server. `docker compose up` works. | 2026-04-26 | 1.2 | done |
+| 1.4 | Move `:core:drive` from SmartMeter V2 worktree → `android/library/`. Move `:sample:drive-tester` → `android/tester/`. Update package paths + Gradle settings. | 2026-04-26 | — | done |
+| 1.5 | `android/gradle/libs.versions.toml` — copy / adapt from V2 worktree. | 2026-04-26 | 1.4 | done |
+| 1.6 | Tester app: point default backend URL at the reference server (`10.0.2.2:8080` for emulator). Upload one file end-to-end against the stub server. | 2026-04-26 | 1.2, 1.4 | done |
+| 1.7 | `.github/workflows/backend-ci.yml`: lint + test on push. (Android CI deferred to Phase 3.) | 2026-04-26 | 1.1 | done |
+| 1.8 | `backend/README.md`: how to run locally, how to run tests. | 2026-04-26 | 1.1, 1.2, 1.3 | done |
 
 **Phase 1 exit criterion**: a fresh clone, `docker compose up`, `./gradlew :tester:installDebug`, tester taps Upload — fake session is minted by reference server, Android library "uploads" to a stub URL the reference server also serves, gets a fake 200 back, displays Succeeded. Zero Drive involvement.
 

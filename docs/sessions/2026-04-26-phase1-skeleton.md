@@ -123,6 +123,70 @@ Existing source to port (do not re-derive):
 
 ## Outcome
 
-> Filled in at end of session.
+Phase 1 skeleton landed in four logical commits:
 
-(blank — to be completed)
+1. **Backend skeleton** — `drive_workspace/` package with stub `DriveWorkspace`
+   facade and sub-managers (`FolderManager`, `UploadSessionMint`,
+   `SpreadsheetLogger`, `ReconciliationRunner`); `PrincipalStore` and
+   `LogSchema` Protocols; empty `stores/sqlalchemy.py` and `adapters/flask.py`
+   placeholders. Reference Flask server with `GET /health`, `POST
+   /api/drive/initiate-upload`, and a `PUT /_stub/upload/<id>` endpoint that
+   fakes Drive's resumable behavior end-to-end (308 between chunks, 200 with
+   metadata at completion). `Dockerfile` (python:3.11-slim) and
+   `backend/README.md`. `ruff` and `mypy --strict` were run locally and are
+   clean.
+2. **Android port** — `core/drive/` → `android/library/` and
+   `sample/drive-tester/` → `android/tester/`, with package rename
+   `com.jpss.smartmeter.core.drive` → `com.driveworkspace.uploader` and
+   `com.jpss.smartmeter.sample.drivetester` → `com.driveworkspace.tester`.
+   `android/gradle/libs.versions.toml` trimmed to only what library + tester
+   actually reference (dropped Maps/Firebase/navigation/CameraX/Coil/
+   Accompanist/exif/location/datastore/security). Tester defaults
+   `backendUrl` to `http://10.0.2.2:8080` with stub device/bearer tokens;
+   manifest enables cleartext for the dev server. Gradle wrapper +
+   `gradle.properties` (sans `MAPS_API_KEY`) copied from V2.
+3. **docker-compose.yml** — postgres:16 (`dev`/`dev`/`dev`) with healthcheck
+   gate + `reference_server` service.
+4. **CI** — `.github/workflows/backend-ci.yml` runs ruff, mypy --strict, and
+   pytest (treats exit code 5 — no tests collected — as success until
+   Phase 3).
+
+### Decisions taken inline (within scope of the open questions)
+
+- **Package rename target**: `com.driveworkspace.uploader` (library),
+  `com.driveworkspace.tester` (tester app). Boring, no fake-org or
+  `.example` prefix; reflects that this is proprietary in-house plumbing
+  (architecture §12).
+- **Postgres dev creds**: `dev`/`dev`/`dev` per the brief.
+- **Port**: 8080.
+- **`pyproject.toml` location**: kept under `backend/` per the brief's
+  recommendation.
+
+### Verified
+
+- `python -m ruff check .` and `python -m mypy --strict drive_workspace/`
+  in `backend/` are both clean.
+
+### Not verified by this session (require dev environment)
+
+- `docker compose up` end-to-end (no Docker invoked; compose file is
+  written but not executed).
+- `./gradlew :tester:assembleDebug` / `:tester:installDebug` (no Android
+  SDK / device available in this session).
+- The full tap-Upload-see-Succeeded loop on a real emulator.
+
+These are the runtime checks in the Definition of Done; the next person to
+boot this on a dev box should walk through them. If anything fails, log the
+fix in a follow-up session brief rather than amending this one.
+
+### Notes for the next session
+
+- A real-looking `MAPS_API_KEY` was present in the source SmartMeter V2
+  worktree's `gradle.properties`. It was stripped before being copied here,
+  but it remains in the SmartMeter repo and is worth rotating out-of-band.
+- Phase 2 entry: ADR-0006 already calls out `mypy --strict` from day one;
+  the empty test directories exist so Phase 3 can drop tests in place.
+- The reference server's stub PUT keeps per-upload byte-receipt state in
+  an in-memory dict guarded by a lock. Single-worker only; fine for Phase 1
+  but obviously goes away in Phase 2 when real Drive resumable URLs take
+  over.
