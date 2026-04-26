@@ -36,14 +36,4 @@ jobs:
         run: mypy --strict drive_workspace/
 
       - name: Pytest
-        # Phase 1 has no real tests yet; exit code 5 means "no tests collected"
-        # which we treat as success until Phase 3.
-        run: |
-          set +e
-          pytest
-          code=$?
-          if [ $code -eq 0 ] || [ $code -eq 5 ]; then
-            exit 0
-          else
-            exit $code
-          fi
+        run: pytest
