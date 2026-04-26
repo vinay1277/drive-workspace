@@ -32,6 +32,14 @@
 
 **Phase 1 exit criterion**: a fresh clone, `docker compose up`, `./gradlew :tester:installDebug`, tester taps Upload — fake session is minted by reference server, Android library "uploads" to a stub URL the reference server also serves, gets a fake 200 back, displays Succeeded. Zero Drive involvement.
 
+**Phase 1 status: closed end-to-end on 2026-04-26.** Tester app on a Samsung
+SM-M526B uploaded a 279 KB image through the Flask reference server (run
+directly via `flask run`, not via docker — Docker Desktop install on the
+dev box is deferred). Two main-thread-network bugs fixed during
+verification (commits `35202e7`, `c03a4b1`). Full details in
+[`sessions/2026-04-26-phase1-skeleton.md`](sessions/2026-04-26-phase1-skeleton.md)
+"Follow-up verification" section.
+
 ## Phase 2 — Real Drive
 
 **Goal**: wire up real Drive credentials and prove the full upload path.

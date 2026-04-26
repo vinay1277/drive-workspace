@@ -239,3 +239,60 @@ brief — not as an amendment to this one.
   an in-memory dict guarded by a lock. Single-worker only; fine for Phase 1
   but obviously goes away in Phase 2 when real Drive resumable URLs take
   over.
+
+### Follow-up verification (2026-04-26 evening)
+
+The two "Not verified by this session" items above were closed by the
+maintainer during a verification pass. Two real bugs surfaced and were
+fixed inline:
+
+**Bug 1 — `BackendInitiator` ran sync OkHttp on the main thread** (commit
+`35202e7`). The `Flow` from `DriveUploader.upload(...)` is collected on
+the host's chosen dispatcher (`viewModelScope` defaults to
+`Dispatchers.Main`), and `DriveUploaderImpl` calls
+`initiator.initiate(request)` directly inside the flow body. The tester's
+`BackendInitiator.initiate` did sync OkHttp without switching dispatchers
+→ `NetworkOnMainThreadException`. The library's catch-block did surface
+it as `UploadProgress.Failed(InitiateFailed)` (graceful-looking failure,
+not a force-close). Fix: wrap the body in `withContext(Dispatchers.IO)`.
+
+**Bug 2 — `ResumableUploadEngine.executeAsync` called
+`runInterruptible { ... }` without specifying a dispatcher** (commit
+`c03a4b1`). `runInterruptible(EmptyCoroutineContext)` inherits the
+caller's dispatcher rather than switching to IO. With Bug 1 fixed,
+initiate succeeded but the first chunk PUT then landed on Main →
+`NetworkOnMainThreadException`. Unlike Bug 1, this was thrown by the
+*library* and bubbled past the engine's `IOException` catch (the
+exception extends `RuntimeException`, not `IOException`) into
+`viewModelScope` as an unhandled exception → real force-close. Fix:
+`runInterruptible(Dispatchers.IO) { ... }`.
+
+**End-to-end verified after both fixes**:
+
+```
+04-26 16:30:00 DriveTester: Picked: Screenshot_20260426_160913.jpg (279003 bytes)
+04-26 16:30:04 DriveTester: Starting upload mode=BACKEND
+04-26 16:30:04 DriveTester: → initiating (attempt 1)
+04-26 16:30:04 DriveTester: ✓ succeeded id=fake-e309d5cd54eafc98
+```
+
+Path: phone (`SM-M526B - 13`) → `adb reverse tcp:8080` → host Flask
+reference server (process-local) → fake `drive_file_id` returned →
+chunk PUTs against `/_stub/upload/<id>` → `200` with fake metadata.
+The full wire path the library and reference server agree on is proven.
+
+`docker compose up` itself remains unrun (Docker Desktop install needed
+admin elevation on the dev box; deferred). The compose file is
+unchanged from what the original session shipped; deferring the Docker
+verification does not affect Phase 1 functional close.
+
+### Open question deferred to Phase 2
+
+Should `DriveUploaderImpl` auto-dispatch the host-supplied
+`UploadInitiator.initiate()` call to `Dispatchers.IO`, so future host
+implementations cannot hit Bug 1 above? Library-side fix would mean
+wrapping the call in `withContext(Dispatchers.IO)` inside `runUpload`.
+The failure mode is sharp enough — sync HTTP on Main is the most common
+host-impl mistake — that the library probably should protect callers.
+Capture as a pending ADR before any Phase 2 work that touches
+`DriveUploaderImpl`.
