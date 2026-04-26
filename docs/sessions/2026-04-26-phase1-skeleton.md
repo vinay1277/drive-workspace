@@ -123,6 +123,176 @@ Existing source to port (do not re-derive):
 
 ## Outcome
 
-> Filled in at end of session.
+Phase 1 skeleton landed in four logical commits:
 
-(blank — to be completed)
+1. **Backend skeleton** — `drive_workspace/` package with stub `DriveWorkspace`
+   facade and sub-managers (`FolderManager`, `UploadSessionMint`,
+   `SpreadsheetLogger`, `ReconciliationRunner`); `PrincipalStore` and
+   `LogSchema` Protocols; empty `stores/sqlalchemy.py` and `adapters/flask.py`
+   placeholders. Reference Flask server with `GET /health`, `POST
+   /api/drive/initiate-upload`, and a `PUT /_stub/upload/<id>` endpoint that
+   fakes Drive's resumable behavior end-to-end (308 between chunks, 200 with
+   metadata at completion). `Dockerfile` (python:3.11-slim) and
+   `backend/README.md`. `ruff` and `mypy --strict` were run locally and are
+   clean.
+2. **Android port** — `core/drive/` → `android/library/` and
+   `sample/drive-tester/` → `android/tester/`, with package rename
+   `com.jpss.smartmeter.core.drive` → `com.driveworkspace.uploader` and
+   `com.jpss.smartmeter.sample.drivetester` → `com.driveworkspace.tester`.
+   `android/gradle/libs.versions.toml` trimmed to only what library + tester
+   actually reference (dropped Maps/Firebase/navigation/CameraX/Coil/
+   Accompanist/exif/location/datastore/security). Tester defaults
+   `backendUrl` to `http://10.0.2.2:8080` with stub device/bearer tokens;
+   manifest enables cleartext for the dev server. Gradle wrapper +
+   `gradle.properties` (sans `MAPS_API_KEY`) copied from V2.
+3. **docker-compose.yml** — postgres:16 (`dev`/`dev`/`dev`) with healthcheck
+   gate + `reference_server` service.
+4. **CI** — `.github/workflows/backend-ci.yml` runs ruff, mypy --strict, and
+   pytest (treats exit code 5 — no tests collected — as success until
+   Phase 3).
+
+### Decisions taken inline (within scope of the open questions)
+
+- **Package rename target**: `com.driveworkspace.uploader` (library),
+  `com.driveworkspace.tester` (tester app). Boring, no fake-org or
+  `.example` prefix; reflects that this is proprietary in-house plumbing
+  (architecture §12).
+- **Postgres dev creds**: `dev`/`dev`/`dev` per the brief.
+- **Port**: 8080.
+- **`pyproject.toml` location**: kept under `backend/` per the brief's
+  recommendation.
+
+### Verified
+
+- `python -m ruff check .` and `python -m mypy --strict drive_workspace/`
+  in `backend/` — clean.
+- `pip install -e .[dev,flask]` succeeds. Flask server boots.
+- `curl /health` → `{"status":"ok"}`.
+- `curl POST /api/drive/initiate-upload` returns a valid session JSON
+  with `upload_url`, `drive_file_id`, `expires_at`.
+- Chunked `PUT /_stub/upload/<id>` end-to-end: first chunk (`Content-Range:
+  bytes 0-999/2000`) returns `308 PERMANENT REDIRECT` with `Range:
+  bytes=0-999`; final chunk returns `200 OK` with
+  `{"id":"fake-...","webViewLink":null}`. This is exactly what the Android
+  library's resumable engine PUTs against, so the wire path is proven.
+- `./gradlew :tester:assembleDebug` — `BUILD SUCCESSFUL` (after the fixups
+  noted below). APK lands at
+  `android/tester/build/outputs/apk/debug/tester-debug.apk` (~12 MB).
+- `./gradlew :library:testDebugUnitTest` — `BUILD SUCCESSFUL`. The ported
+  Robolectric/JUnit tests for `LocalCheckpointStore`,
+  `ResumableUploadEngine`, and `RetryPolicy` all pass under the renamed
+  `com.driveworkspace.uploader` package.
+- Android emulator (AVD `drive_test`, system-images;android-35;google_apis,
+  WHPX accel) booted headless. `adb install -r tester-debug.apk` →
+  `Success`. `pm list packages` shows `com.driveworkspace.tester`. Verified
+  the emulator can reach the host's reference server at `10.0.2.2:8080`
+  (a malformed TCP test triggered Flask's HTML 400 page — proves routing).
+- `am start -n com.driveworkspace.tester/.MainActivity`: `Displayed ... +3s`.
+  `dumpsys activity activities` confirms `topResumedActivity = MainActivity`.
+  No FATAL/AndroidRuntime entries in logcat.
+
+### Fixups uncovered by running the build (committed)
+
+- `compileSdk` and `targetSdk` 35 → 36 in both modules. The androidx
+  versions in the trimmed `libs.versions.toml`
+  (`core-ktx 1.17.0`, `activity 1.11.0`, `lifecycle 2.9.4`) require API 36;
+  AGP 8.12 fails fast on the AAR metadata mismatch. Build-tools 36 and
+  `platforms;android-36` are already what's installed, so this is a no-op
+  on the dev side.
+- `:tester` build.gradle.kts: enabled `isCoreLibraryDesugaringEnabled` and
+  added the `coreLibraryDesugaring(libs.android.desugar.jdk.libs)` dep —
+  required because `:library` consumes desugared APIs and AGP enforces
+  app-side opt-in.
+- Restored `androidx.test.ext:junit` (`androidx-junit`) in
+  `libs.versions.toml`; the ported `LocalCheckpointStoreTest` uses
+  `@RunWith(AndroidJUnit4::class)`. It got dropped during the initial trim
+  because the original SmartMeter library `build.gradle.kts` doesn't list
+  it (presumably it never compiled cleanly there either).
+
+### Not verified by this session
+
+- **`docker compose up`**. Docker Desktop install via `winget install
+  Docker.DockerDesktop` requires admin elevation (UAC prompt) that this
+  non-interactive shell cannot satisfy — installer exits with the
+  Win32 elevation error code. WSL2 distro install has the same elevation
+  wall. The compose file itself is straightforward (postgres healthcheck +
+  reference_server build); next dev to launch Docker Desktop interactively
+  should be able to `docker compose up` and re-run the same `/health` and
+  `/api/drive/initiate-upload` curl checks against `localhost:8080`.
+- **The UI tap-Upload-see-Succeeded loop in the running app**. The tester
+  uses an `ACTION_OPEN_DOCUMENT` system picker which is impractical to
+  drive headlessly via `adb shell input`. Everything underneath the UI tap
+  is verified independently above; the manual smoke test on a real device
+  is a one-minute confirmation step for whoever runs it next.
+
+If either of the unverified items trips, log it in a follow-up session
+brief — not as an amendment to this one.
+
+### Notes for the next session
+
+- A real-looking `MAPS_API_KEY` was present in the source SmartMeter V2
+  worktree's `gradle.properties`. It was stripped before being copied here,
+  but it remains in the SmartMeter repo and is worth rotating out-of-band.
+- Phase 2 entry: ADR-0006 already calls out `mypy --strict` from day one;
+  the empty test directories exist so Phase 3 can drop tests in place.
+- The reference server's stub PUT keeps per-upload byte-receipt state in
+  an in-memory dict guarded by a lock. Single-worker only; fine for Phase 1
+  but obviously goes away in Phase 2 when real Drive resumable URLs take
+  over.
+
+### Follow-up verification (2026-04-26 evening)
+
+The two "Not verified by this session" items above were closed by the
+maintainer during a verification pass. Two real bugs surfaced and were
+fixed inline:
+
+**Bug 1 — `BackendInitiator` ran sync OkHttp on the main thread** (commit
+`35202e7`). The `Flow` from `DriveUploader.upload(...)` is collected on
+the host's chosen dispatcher (`viewModelScope` defaults to
+`Dispatchers.Main`), and `DriveUploaderImpl` calls
+`initiator.initiate(request)` directly inside the flow body. The tester's
+`BackendInitiator.initiate` did sync OkHttp without switching dispatchers
+→ `NetworkOnMainThreadException`. The library's catch-block did surface
+it as `UploadProgress.Failed(InitiateFailed)` (graceful-looking failure,
+not a force-close). Fix: wrap the body in `withContext(Dispatchers.IO)`.
+
+**Bug 2 — `ResumableUploadEngine.executeAsync` called
+`runInterruptible { ... }` without specifying a dispatcher** (commit
+`c03a4b1`). `runInterruptible(EmptyCoroutineContext)` inherits the
+caller's dispatcher rather than switching to IO. With Bug 1 fixed,
+initiate succeeded but the first chunk PUT then landed on Main →
+`NetworkOnMainThreadException`. Unlike Bug 1, this was thrown by the
+*library* and bubbled past the engine's `IOException` catch (the
+exception extends `RuntimeException`, not `IOException`) into
+`viewModelScope` as an unhandled exception → real force-close. Fix:
+`runInterruptible(Dispatchers.IO) { ... }`.
+
+**End-to-end verified after both fixes**:
+
+```
+04-26 16:30:00 DriveTester: Picked: Screenshot_20260426_160913.jpg (279003 bytes)
+04-26 16:30:04 DriveTester: Starting upload mode=BACKEND
+04-26 16:30:04 DriveTester: → initiating (attempt 1)
+04-26 16:30:04 DriveTester: ✓ succeeded id=fake-e309d5cd54eafc98
+```
+
+Path: phone (`SM-M526B - 13`) → `adb reverse tcp:8080` → host Flask
+reference server (process-local) → fake `drive_file_id` returned →
+chunk PUTs against `/_stub/upload/<id>` → `200` with fake metadata.
+The full wire path the library and reference server agree on is proven.
+
+`docker compose up` itself remains unrun (Docker Desktop install needed
+admin elevation on the dev box; deferred). The compose file is
+unchanged from what the original session shipped; deferring the Docker
+verification does not affect Phase 1 functional close.
+
+### Open question deferred to Phase 2
+
+Should `DriveUploaderImpl` auto-dispatch the host-supplied
+`UploadInitiator.initiate()` call to `Dispatchers.IO`, so future host
+implementations cannot hit Bug 1 above? Library-side fix would mean
+wrapping the call in `withContext(Dispatchers.IO)` inside `runUpload`.
+The failure mode is sharp enough — sync HTTP on Main is the most common
+host-impl mistake — that the library probably should protect callers.
+Capture as a pending ADR before any Phase 2 work that touches
+`DriveUploaderImpl`.

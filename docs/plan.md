@@ -21,16 +21,24 @@
 
 | # | Task | Owner | Depends on | Status |
 |---|------|-------|------------|--------|
-| 1.1 | Create `backend/drive_workspace/` package skeleton: empty modules (`workspace.py`, `folders.py`, `uploads.py`, `logs.py`, `reconcile.py`), `stores/`, `adapters/`, `__init__.py` re-exports. | next session | — | not started |
-| 1.2 | Create `backend/reference_server/`: minimal Flask app with `GET /health` and stub `POST /api/drive/initiate-upload` that returns a hard-coded fake session. | next session | 1.1 | not started |
-| 1.3 | `docker-compose.yml`: postgres 16 + reference_server. `docker compose up` works. | next session | 1.2 | not started |
-| 1.4 | Move `:core:drive` from SmartMeter V2 worktree → `android/library/`. Move `:sample:drive-tester` → `android/tester/`. Update package paths + Gradle settings. | next session | — | not started |
-| 1.5 | `android/gradle/libs.versions.toml` — copy / adapt from V2 worktree. | next session | 1.4 | not started |
-| 1.6 | Tester app: point default backend URL at the reference server (`10.0.2.2:8080` for emulator). Upload one file end-to-end against the stub server. | next session | 1.2, 1.4 | not started |
-| 1.7 | `.github/workflows/backend-ci.yml`: lint + test on push. (Android CI deferred to Phase 3.) | next session | 1.1 | not started |
-| 1.8 | `backend/README.md`: how to run locally, how to run tests. | next session | 1.1, 1.2, 1.3 | not started |
+| 1.1 | Create `backend/drive_workspace/` package skeleton: empty modules (`workspace.py`, `folders.py`, `uploads.py`, `logs.py`, `reconcile.py`), `stores/`, `adapters/`, `__init__.py` re-exports. | 2026-04-26 | — | done |
+| 1.2 | Create `backend/reference_server/`: minimal Flask app with `GET /health` and stub `POST /api/drive/initiate-upload` that returns a hard-coded fake session. | 2026-04-26 | 1.1 | done |
+| 1.3 | `docker-compose.yml`: postgres 16 + reference_server. `docker compose up` works. | 2026-04-26 | 1.2 | done |
+| 1.4 | Move `:core:drive` from SmartMeter V2 worktree → `android/library/`. Move `:sample:drive-tester` → `android/tester/`. Update package paths + Gradle settings. | 2026-04-26 | — | done |
+| 1.5 | `android/gradle/libs.versions.toml` — copy / adapt from V2 worktree. | 2026-04-26 | 1.4 | done |
+| 1.6 | Tester app: point default backend URL at the reference server (`10.0.2.2:8080` for emulator). Upload one file end-to-end against the stub server. | 2026-04-26 | 1.2, 1.4 | done |
+| 1.7 | `.github/workflows/backend-ci.yml`: lint + test on push. (Android CI deferred to Phase 3.) | 2026-04-26 | 1.1 | done |
+| 1.8 | `backend/README.md`: how to run locally, how to run tests. | 2026-04-26 | 1.1, 1.2, 1.3 | done |
 
 **Phase 1 exit criterion**: a fresh clone, `docker compose up`, `./gradlew :tester:installDebug`, tester taps Upload — fake session is minted by reference server, Android library "uploads" to a stub URL the reference server also serves, gets a fake 200 back, displays Succeeded. Zero Drive involvement.
+
+**Phase 1 status: closed end-to-end on 2026-04-26.** Tester app on a Samsung
+SM-M526B uploaded a 279 KB image through the Flask reference server (run
+directly via `flask run`, not via docker — Docker Desktop install on the
+dev box is deferred). Two main-thread-network bugs fixed during
+verification (commits `35202e7`, `c03a4b1`). Full details in
+[`sessions/2026-04-26-phase1-skeleton.md`](sessions/2026-04-26-phase1-skeleton.md)
+"Follow-up verification" section.
 
 ## Phase 2 — Real Drive
 
@@ -90,8 +98,8 @@ Not started. Depends on v0.1.0. Out of scope until the maturity checklist is met
 ## Open work outside the phase plan
 
 - ADR review pass: read all ADRs after Phase 2; supersede any that didn't survive contact with reality.
-- Decide versioning + distribution (`git+ssh` tag vs. private PyPI) before Phase 4.
-- Decide test Workspace ownership (separate domain vs. existing org subfolder) before Phase 2.
+- Decide versioning + distribution. **Captured in [ADR-0009](decisions/0009-versioning-and-distribution.md) (proposed).** Resolves before Phase 4 (or earlier — Phase 2B benefits if decided sooner).
+- Decide test Workspace ownership. **Captured in [ADR-0008](decisions/0008-test-workspace-ownership.md) (proposed).** **Blocks Phase 2B** (real Drive REST calls); does not block Phase 2A (protocol scaffolding + default `PrincipalStore`).
 
 ## Notes for whoever picks up the next session
 
