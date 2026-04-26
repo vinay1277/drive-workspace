@@ -48,5 +48,5 @@ fun interface UploadInitiator {
      *   non-retryable initiate failure unless the implementation chooses
      *   to apply its own retry policy upstream.
      */
-    suspend fun initiate(request: UploadRequest, count: Int = 1): List<UploadSession>
+    suspend fun initiate(request: UploadRequest, count: Int): List<UploadSession>
 }
