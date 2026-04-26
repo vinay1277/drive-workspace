@@ -47,12 +47,12 @@ verification (commits `35202e7`, `c03a4b1`). Full details in
 | # | Task | Status |
 |---|------|--------|
 | 2.1 | Provision the test Workspace + service account + test root folder. Document in `docs/deployment.md`. | not started |
-| 2.2 | `Authenticator` impl: load SA credential from file path, env, or callable. | not started |
+| 2.2 | `Authenticator` impl: load SA credential from file path, env, or callable. | done (file path; env/callable deferred until a host needs them) |
 | 2.3 | `FolderManager.provision()`: create folder from template, share view-only, persist mapping via `PrincipalStore`. | not started |
 | 2.4 | `FolderManager.revoke()`: drop share; folder remains. | not started |
 | 2.5 | `UploadSessionMint.initiate()`: real `POST /upload/drive/v3/files?uploadType=resumable` to Drive; persist audit row. | not started |
-| 2.6 | Default `SqlAlchemyPrincipalStore`: schema migrations, basic CRUD. | not started |
-| 2.7 | `LogSchema` protocol + reference impl. `SpreadsheetLogger.append()` via Sheets API. | not started |
+| 2.6 | Default `SqlAlchemyPrincipalStore`: schema migrations, basic CRUD. | done (CRUD; Alembic migrations deferred to Phase 3) |
+| 2.7 | `LogSchema` protocol + reference impl. `SpreadsheetLogger.append()` via Sheets API. | partial (Protocol + ColumnSpec + reference impl done; Sheets `append` is Phase 2B) |
 | 2.8 | `ReconciliationRunner` + `python -m drive_workspace.reconcile` CLI. Orphan detection + cleanup. | not started |
 | 2.9 | Reference server wires real `DriveWorkspace`. Tester app uploads real file into real Drive, observed by browsing drive.google.com. | not started |
 | 2.10 | Session prefetch bank: extend backend endpoint with `count` param; library stores + draws from local bank. | not started |
