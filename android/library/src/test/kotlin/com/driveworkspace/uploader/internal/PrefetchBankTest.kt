@@ -186,7 +186,7 @@ class PrefetchBankTest {
         assertEquals(3, bank.count())
 
         val drawnPhoto = bank.tryDraw(photoSmall)
-        assertEquals("ps-1", drawnPhoto?.uploadUrl)
+        assertEquals("https://stub.invalid/ps-1", drawnPhoto?.uploadUrl)
         assertNull(
             "drawing photoSmall again must not return the audioSmall row",
             bank.tryDraw(photoSmall),
@@ -194,10 +194,10 @@ class PrefetchBankTest {
         assertEquals(2, bank.count())
 
         val drawnAudio = bank.tryDraw(audioSmall)
-        assertEquals("as-1", drawnAudio?.uploadUrl)
+        assertEquals("https://stub.invalid/as-1", drawnAudio?.uploadUrl)
 
         val drawnLarge = bank.tryDraw(photoLarge)
-        assertEquals("pl-1", drawnLarge?.uploadUrl)
+        assertEquals("https://stub.invalid/pl-1", drawnLarge?.uploadUrl)
         assertEquals(0, bank.count())
     }
 
