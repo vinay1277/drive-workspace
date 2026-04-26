@@ -34,6 +34,12 @@ dev = [
     "ruff>=0.5",
     "responses>=0.25",
 ]
+docs = [
+    "sphinx>=7.3",
+    "myst-parser>=3.0",
+    "sphinx-autodoc2>=0.5",
+    "sphinx-rtd-theme>=2.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

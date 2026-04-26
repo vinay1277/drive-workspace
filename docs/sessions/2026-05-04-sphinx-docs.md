@@ -115,6 +115,89 @@ docs = [
 
 ## Outcome
 
-> Filled in at end of session.
+Sphinx is up and the build is **already clean under `-W`** —
+better than the brief expected (the brief authorised first-cut
+warnings; the docstring pass + autodoc2's modern handling of
+PEP 604 / Protocol means there were no actual warnings to log).
 
-(blank — to be completed)
+**Build**
+
+```
+cd backend
+pip install -e .[docs]
+cd docs
+sphinx-build -b html -W --keep-going . _build/html  # exit 0
+```
+
+13 production-module HTML pages emitted under `_build/html/apidocs/`:
+top-level package, `adapters`, `adapters.flask`, `auth`, `folders`,
+`logs`, `reconcile`, `stores`, `stores.protocol`, `stores.sqlalchemy`,
+`uploads`, `workspace`, plus `index.html`. `tests/` modules excluded
+via `autodoc2_skip_module_regexes`. All required symbols
+(`DriveWorkspace`, `FileAuthenticator`, `SqlAlchemyPrincipalStore`,
+`LogSchema`, `ColumnSpec`, `Authenticator`, `PrincipalStore`,
+`FileSpec`, `UploadSession`, `UploadSessionMint`, `FolderManager`,
+`SpreadsheetLogger`, `ReconciliationRunner`, `make_blueprint`,
+`MAX_PREFETCH_COUNT`) appear in the rendered reference.
+
+**Decisions baked into `conf.py`**
+
+- Docstring style: **Google** (locked in `conf.py` module docstring).
+- Modern autodoc via **sphinx-autodoc2**, MyST render plugin so
+  Google-style sections survive the autodoc2 → MyST → HTML pipeline
+  cleanly.
+- Hidden objects: dunders, private (`_`-prefixed), inherited.
+- `nitpicky = False` for now — Phase 3 hardening will turn it on.
+- HTML theme: `sphinx_rtd_theme`.
+
+**Files added**
+
+- `backend/pyproject.toml`: new `[project.optional-dependencies]
+  docs` extra (sphinx ≥7.3, myst-parser ≥3.0, sphinx-autodoc2 ≥0.5,
+  sphinx-rtd-theme ≥2.0).
+- `backend/docs/conf.py`, `index.md`, `Makefile`, `make.bat`,
+  `.gitignore` (covers `_build/` and the autodoc2-generated
+  `apidocs/` source-tree).
+
+**Files modified — docstring pass**
+
+Sparse public symbols got Google-style docstrings:
+
+- `drive_workspace/folders.py` — class + `provision` + `revoke`
+  (Args, Raises, ADR-0002 cross-ref).
+- `drive_workspace/uploads.py` — `FileSpec`, `UploadSession`,
+  `UploadSessionMint.initiate` (Attributes / Args / Returns /
+  Raises).
+- `drive_workspace/reconcile.py` — class + `run`.
+- `drive_workspace/workspace.py` — `Authenticator` Protocol method,
+  full constructor docstring on `DriveWorkspace` (Args, Raises,
+  Attributes; calls out the ADR-0011 `shared_drive_id`
+  validation).
+- `drive_workspace/logs.py` — `ColumnSpec`, `LogSchema` Protocol
+  methods, `SpreadsheetLogger.append`.
+- `drive_workspace/stores/protocol.py` — every Protocol method
+  docstring'd.
+
+**plan.md updates**
+
+- Phase 3.4 marked done (the docstring pass + clean `sphinx-build`
+  the maturity checklist asks for).
+- New Phase 3.4a (not started): add `sphinx-build -W` step to
+  `.github/workflows/backend-ci.yml`. Deferred from this session
+  per the brief's "do NOT add CI step here" guidance.
+
+**Verification**
+
+- `sphinx-build -W --keep-going` → exit 0, no warnings.
+- `mypy --strict drive_workspace/` → 20 source files, clean.
+- `pytest backend/` → 56 passed, 1 skipped (postgres).
+- `ruff check .` → clean.
+
+**Out of scope (per brief, unchanged)**
+
+- Theme customization beyond `sphinx-rtd-theme` defaults.
+- ReadTheDocs / GitHub Pages hosting.
+- Documenting `internal/` or `tests/` modules (autodoc2 hides
+  underscore-prefixed symbols; tests excluded via
+  `autodoc2_skip_module_regexes`).
+- Tutorials / how-to pages beyond `index.md`.

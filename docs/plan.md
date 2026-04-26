@@ -66,7 +66,8 @@ verification (commits `35202e7`, `c03a4b1`). Full details in
 | 3.1 | `drive_workspace/tests/` — unit tests with `responses` mocking Drive/Sheets APIs. ≥85% line coverage on package code. | not started |
 | 3.2 | `integration-tests/` — at least three end-to-end tests: happy path, mid-stream disconnect, session expiry + re-init. Run against real test Drive in CI. | not started |
 | 3.3 | `mypy --strict` clean across `drive_workspace/`. | not started |
-| 3.4 | API documentation: every public symbol has a docstring; `sphinx` build succeeds. | not started |
+| 3.4 | API documentation: every public symbol has a docstring; `sphinx` build succeeds. | done (sphinx-build clean under `-W` already; see `2026-05-04-sphinx-docs`) |
+| 3.4a | Add `sphinx-build -b html -W` to `.github/workflows/backend-ci.yml` so docstring drift fails CI. Deferred from `2026-05-04-sphinx-docs` to keep that session scoped to the scaffold. | not started |
 | 3.5 | A second `LogSchema` impl (intentionally different shape) to validate the abstraction. | not started |
 | 3.6 | One contract change exercised end-to-end (e.g. add a metadata field; touch backend, library, integration tests in one PR). | not started |
 | 3.7 | `docs/deployment.md` + `docs/integration-guide.md` complete. | not started |
