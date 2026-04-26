@@ -130,6 +130,87 @@ Do not read prior session transcripts.
 
 ## Outcome
 
-> Filled in at end of session.
+ADR-0003 applied across library, tester, and reference server in five
+commits as the brief specified.
 
-(blank — to be completed)
+**Library**
+
+- `DriveUploader` interface gains
+  `suspend fun prefetchSessions(count, requestTemplate): Int` plus a
+  `MAX_PREFETCH_COUNT = 50` cap.
+- `UploadInitiator.initiate` signature changes (pre-v0.1.0 break) to
+  `suspend fun initiate(request, count: Int = 1): List<UploadSession>`
+  so prefetch is a single backend round-trip rather than N sequential
+  ones.
+- `UploadRequest` gains `kindHint: String? = null` — typed slot for
+  the prefetch fingerprint instead of a magic key in `metadata`.
+- New Room schema (DB v2, destructive migration): `BankedSessionEntity`
+  + `BankedSessionDao` with `@Transaction drawOne`. `BankStore`
+  centralises the bank invariants — prune-on-touch (5-day TTL),
+  fingerprint construction, kind-null sentinel.
+- `DriveUploaderImpl` consults the bank before live initiate; bank hit
+  bypasses `UploadInitiator.initiate` entirely (the headline DoD
+  assertion). On `SessionExpired` the impl skips the bank for the
+  retry to avoid drawing another likely-stale row.
+- `DriveUploaderFactory` plumbs the new DAO; existing `DriveUploaderModule`
+  (Hilt) needs no change because it goes through the factory.
+
+**Tests** — all JVM-only via `FakeBankedSessionDao` (no Robolectric):
+
+- prefetch banks N, draw shrinks to N-1
+- 4×N concurrent draws against pool of N return exactly N unique rows
+  (FakeBankedSessionDao serialises draws via Mutex to model Room's
+  writer-thread serialisation)
+- stale rows pruned on bank-touch (mutable `nowMs` clock)
+- bank miss falls through to live initiate (initiator called once)
+- bank hit and initiator NOT called
+- different fingerprints don't collide (mime/kind/bracket axes)
+- prefetch count > MAX coerced down
+
+Existing `DriveUploaderDispatcherTest` updated for the new
+`UploadInitiator` SAM signature and `DriveUploaderImpl`'s new `bank`
+constructor parameter.
+
+**Tester app** — "Prefetch 5 sessions" button added below the upload
+row, only enabled in Backend mode. ViewModel builds a template
+`UploadRequest(kindHint="tester-smoke", fileSizeBytes=1)`; the upload
+path now uses the same `kindHint` so prefetched sessions actually
+match. Manual smoke procedure (prefetch → kill backend → upload) is
+documented inline next to the button.
+
+**Reference server**
+
+- `POST /api/drive/initiate-upload[?count=N]` — `count` defaults to 1,
+  capped at `MAX_PREFETCH_COUNT = 50`. Validation: integer, in range,
+  else 400 with `{"error": "..."}`.
+- Response shape changes from a flat object to `{"sessions": [...]}`
+  always — even for `count=1`.
+- `tests/test_initiate_upload.py` covers the array shape for count=1
+  and N, uniqueness across the batch, the cap edge, and the three
+  rejection cases (out-of-range, zero, non-integer).
+
+**Docs**
+
+- New `docs/BACKEND_CONTRACT.md` — endpoint shape, `count` semantics,
+  array response, status codes, links to ADR-0001 + ADR-0003 and to
+  the reference impl + library client.
+
+**Commits** (in order):
+1. `feat(library): public API surface for prefetch bank` — `8a40f25`
+2. `feat(library): Room schema for prefetch bank` — `72998bf`
+3. `feat(library): wire prefetch bank into upload + prefetch paths` — `07e908c`
+4. `feat(tester): Prefetch 5 sessions button + matching upload kindHint` — `4bcf74a`
+5. (this commit) `feat(server): count param + array response shape;
+   add BACKEND_CONTRACT.md` — references this brief filename.
+
+**Verification status**: code-only this session. Build/test
+verification (`./gradlew :library:test`, `:tester:assembleDebug`,
+`pytest backend/`) is the next dev-box step. Any failure is a
+follow-up; nothing in the design hinges on a result we couldn't get
+from this environment.
+
+**Out of scope (deferred)**:
+- Background bank refill (ADR-0003 left this as "lazy" — confirmed).
+- Phase 3 Android instrumentation test exercising the upload Flow
+  collected on `Dispatchers.Main` — gap noted in ADR-0010 and still
+  open.
