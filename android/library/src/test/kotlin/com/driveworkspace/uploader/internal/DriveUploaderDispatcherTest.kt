@@ -5,6 +5,7 @@ import com.driveworkspace.uploader.api.UploadInitiator
 import com.driveworkspace.uploader.api.UploadProgress
 import com.driveworkspace.uploader.api.UploadRequest
 import com.driveworkspace.uploader.api.UploadSession
+import com.driveworkspace.uploader.internal.checkpoint.BankStore
 import com.driveworkspace.uploader.internal.checkpoint.LocalCheckpointStore
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -54,7 +55,12 @@ class DriveUploaderDispatcherTest {
             retryPolicy = RetryPolicy(config),
             config = config,
         )
-        val impl = DriveUploaderImpl(initiator, engine, config)
+        val impl = DriveUploaderImpl(
+            initiator = initiator,
+            engine = engine,
+            config = config,
+            bank = BankStore(FakeBankedSessionDao()),
+        )
 
         val request = UploadRequest(
             fileName = tempFile.name,

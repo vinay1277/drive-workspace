@@ -7,6 +7,7 @@ import com.driveworkspace.uploader.api.UploadInitiator
 import com.driveworkspace.uploader.internal.DriveUploaderImpl
 import com.driveworkspace.uploader.internal.ResumableUploadEngine
 import com.driveworkspace.uploader.internal.RetryPolicy
+import com.driveworkspace.uploader.internal.checkpoint.BankStore
 import com.driveworkspace.uploader.internal.checkpoint.DriveUploadDatabase
 import com.driveworkspace.uploader.internal.checkpoint.LocalCheckpointStore
 import okhttp3.OkHttpClient
@@ -28,11 +29,12 @@ object DriveUploaderFactory {
         httpClient: OkHttpClient? = null,
     ): DriveUploader {
         val client = httpClient ?: defaultHttpClient(config)
-        val dao = DriveUploadDatabase.get(context).checkpointDao()
-        val store = LocalCheckpointStore(dao)
+        val db = DriveUploadDatabase.get(context)
+        val checkpointStore = LocalCheckpointStore(db.checkpointDao())
+        val bankStore = BankStore(db.bankedSessionDao())
         val retry = RetryPolicy(config)
-        val engine = ResumableUploadEngine(client, store, retry, config)
-        return DriveUploaderImpl(initiator, engine, config)
+        val engine = ResumableUploadEngine(client, checkpointStore, retry, config)
+        return DriveUploaderImpl(initiator, engine, config, bankStore)
     }
 
     private fun defaultHttpClient(config: DriveUploaderConfig): OkHttpClient =

@@ -6,6 +6,8 @@ import com.driveworkspace.uploader.api.UploadError
 import com.driveworkspace.uploader.api.UploadInitiator
 import com.driveworkspace.uploader.api.UploadProgress
 import com.driveworkspace.uploader.api.UploadRequest
+import com.driveworkspace.uploader.api.UploadSession
+import com.driveworkspace.uploader.internal.checkpoint.BankStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -20,6 +22,7 @@ internal class DriveUploaderImpl(
     private val initiator: UploadInitiator,
     private val engine: ResumableUploadEngine,
     private val config: DriveUploaderConfig,
+    private val bank: BankStore,
 ) : DriveUploader {
 
     /** Single-flight per local file path. Different files upload in parallel. */
@@ -42,14 +45,28 @@ internal class DriveUploaderImpl(
         count: Int,
         requestTemplate: UploadRequest,
     ): Int {
-        // Real implementation lands in the bank-wiring commit; for now this stub
-        // keeps the public surface compilable without behaviour change for
-        // hosts that haven't started using prefetch yet.
-        Timber.tag(TAG).w(
-            "prefetchSessions called but bank wiring is not yet enabled (count=%d)",
-            count,
-        )
-        return 0
+        if (count <= 0) return 0
+        val capped = count.coerceAtMost(DriveUploader.MAX_PREFETCH_COUNT)
+        if (capped < count) {
+            Timber.tag(TAG).w(
+                "prefetchSessions count=%d capped at %d (DriveUploader.MAX_PREFETCH_COUNT)",
+                count, capped,
+            )
+        }
+        val sessions = try {
+            withContext(Dispatchers.IO) { initiator.initiate(requestTemplate, capped) }
+        } catch (t: Throwable) {
+            Timber.tag(TAG).w(t, "prefetchSessions: initiator failed")
+            return 0
+        }
+        if (sessions.isEmpty()) return 0
+        if (sessions.size != capped) {
+            Timber.tag(TAG).w(
+                "prefetchSessions: requested %d, initiator returned %d; banking what we got",
+                capped, sessions.size,
+            )
+        }
+        return bank.bank(requestTemplate, sessions)
     }
 
     private fun runUpload(localFile: File, request: UploadRequest): Flow<UploadProgress> = flow {
@@ -58,15 +75,15 @@ internal class DriveUploaderImpl(
             return@flow
         }
         var initAttempt = 0
+        // Once we use a banked session and it expires, we fall through to live
+        // initiate on the next loop iteration — never re-draw, since the bank
+        // entry that just expired is unlikely to be the only stale one.
+        var bankExhausted = false
         while (true) {
             initAttempt++
             emit(UploadProgress.Initiating(initAttempt))
             val session = try {
-                val sessions = withContext(Dispatchers.IO) { initiator.initiate(request, 1) }
-                check(sessions.isNotEmpty()) {
-                    "UploadInitiator.initiate returned empty list for count=1"
-                }
-                sessions.first()
+                obtainSession(request, allowBank = !bankExhausted)
             } catch (t: Throwable) {
                 Timber.tag(TAG).w(t, "initiate failed")
                 emit(UploadProgress.Failed(UploadError.InitiateFailed(t), isRetryable = true))
@@ -91,8 +108,9 @@ internal class DriveUploaderImpl(
                         emit(UploadProgress.Failed(UploadError.SessionExpired(), isRetryable = true))
                         return@flow
                     }
+                    bankExhausted = true
                     Timber.tag(TAG).i("session expired — re-initiating (attempt=%d)", initAttempt + 1)
-                    // Loop and re-initiate.
+                    // Loop and re-initiate live.
                 }
                 is ResumableUploadEngine.Outcome.Failed -> {
                     emit(UploadProgress.Failed(outcome.error, isRetryable = isRetryable(outcome.error)))
@@ -100,6 +118,30 @@ internal class DriveUploaderImpl(
                 }
             }
         }
+    }
+
+    /**
+     * Try the bank first (if allowed); fall through to a live initiator
+     * call dispatched to IO per ADR-0010. The bank lookup itself runs on
+     * IO too — Room is suspend-friendly but its query work shouldn't run
+     * on Main, and the prune step can touch the DB writer.
+     */
+    private suspend fun obtainSession(
+        request: UploadRequest,
+        allowBank: Boolean,
+    ): UploadSession {
+        if (allowBank) {
+            val banked = withContext(Dispatchers.IO) { bank.tryDraw(request) }
+            if (banked != null) {
+                Timber.tag(TAG).i("upload using banked session")
+                return banked
+            }
+        }
+        val sessions = withContext(Dispatchers.IO) { initiator.initiate(request, 1) }
+        check(sessions.isNotEmpty()) {
+            "UploadInitiator.initiate returned empty list for count=1"
+        }
+        return sessions.first()
     }
 
     private fun isRetryable(error: UploadError): Boolean = when (error) {
