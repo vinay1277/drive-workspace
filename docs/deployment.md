@@ -80,15 +80,12 @@ will require resolution before Phase 2B can ship real provisioning.
    metadata-only, no quota) but cannot create the template Spreadsheet —
    that step is deliberately skipped.
 
-   **Fixes for Phase 2B (pick one):**
-   - **Shared Drives** (formerly Team Drives) — files in Shared Drives count
-     against the org's pooled quota, not any individual SA. Requires a
-     Workspace plan that includes Shared Drives.
-   - **Domain-wide delegation** — SA impersonates a real Workspace user;
-     created files belong to that user. Requires Workspace admin to grant
-     the SA delegation rights for specific scopes.
-   - **Pre-created files** — a real user creates files in advance, SA
-     mutates them. Doesn't scale to per-principal provisioning.
+   **Resolution**: see [ADR-0011](decisions/0011-sa-storage-quota.md).
+   Phase 2B will host all `drive-workspace` content inside a Shared
+   Drive owned by `meternnj-org`, with the SA as Content Manager.
+   Files created inside a Shared Drive are charged to the org's pooled
+   storage and the `403 storageQuotaExceeded` failure goes away. DWD
+   and Hybrid were considered and rejected; rationale is in the ADR.
 
 2. **Vision-OCR-named SA serving multiple purposes.** The SA's name is
    misleading — `vision-ocr` is now also the drive-workspace-test bed SA.
@@ -119,11 +116,14 @@ account-verification review:
 4. **Re-share the existing Drive folder topology** (or move it) with the new SA.
    Drop the share with `vision-ocr@...`. The folder IDs stay the same;
    only the access-control row changes.
-5. **Decide on the Path-B-known-limitation #1 fix** (Shared Drive vs. DWD)
-   and provision that infrastructure.
-6. **Re-run the bootstrap script** against the new SA; expected: folders
-   already exist (idempotent), Sheet creation now succeeds (because
-   Shared Drive / DWD).
+5. **Provision the Shared Drive** per [ADR-0011](decisions/0011-sa-storage-quota.md):
+   create `drive-workspace-test` Shared Drive in `meternnj-org`, allow
+   external members (so per-principal view-only shares to personal
+   Gmails work), add the new SA as **Content Manager**.
+6. **Re-run a Shared-Drive-aware bootstrap script** against the new SA
+   — same folder topology but parented inside the Shared Drive root,
+   with `supportsAllDrives=True` on every Drive API call. Sheet
+   creation succeeds (Shared Drive pooled quota).
 7. **Update this document**:
    - Replace the Path B section with a "Path A — current" section.
    - Move Path B notes to a "History — superseded" section.
@@ -155,6 +155,37 @@ Estimated effort: 30 min once verification clears.
 ---
 
 ## Operational notes
+
+### 2026-04-29 — Phase 2B prep: ADR-0011 chosen approach
+
+[ADR-0011](decisions/0011-sa-storage-quota.md) closes the SA-quota
+question that this document surfaced. **Decision: Shared Drives.** No
+library auth-code change in this session; `FileAuthenticator` is
+unchanged. Phase 2B picks up the implementation discipline.
+
+**What Phase 2B inherits from this decision:**
+
+| Item                              | Value                                                    |
+|-----------------------------------|----------------------------------------------------------|
+| New env var                       | `DRIVE_WORKSPACE_SHARED_DRIVE_ID` (constructor-validated, non-empty) |
+| Existing env var, new meaning     | `DRIVE_WORKSPACE_ROOT_FOLDER_ID` is now a folder *inside* the Shared Drive |
+| Required Drive API kwargs         | `supportsAllDrives=True` (every call) and `includeItemsFromAllDrives=True` (list/search) |
+| SA role on the Shared Drive       | Content Manager (not Manager — Manager is too permissive) |
+| External-sharing policy           | Shared Drive must allow external members so per-principal view-only shares work |
+
+**Code changes deferred to Phase 2B:**
+
+- `FolderManager.provision`, `UploadSessionMint.initiate`, and any
+  Drive call in the reference server: thread the `supportsAllDrives`
+  kwarg through.
+- A typed config loader that reads `DRIVE_WORKSPACE_SHARED_DRIVE_ID`
+  and rejects empty / missing at startup (same fail-fast pattern as
+  `FileAuthenticator`'s existence check).
+
+**No code changes in this session.** The full Shared Drives flag
+checklist lives in ADR-0011's Implementation notes; the integration
+tests in Phase 3 are the executable proof point. Path A migration
+(this document, above) is the operational gate.
 
 ### 2026-04-26 — Docker Desktop installed; `docker compose up` verified
 
