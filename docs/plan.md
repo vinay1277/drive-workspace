@@ -90,8 +90,8 @@ Not started. Depends on v0.1.0. Out of scope until the maturity checklist is met
 ## Open work outside the phase plan
 
 - ADR review pass: read all ADRs after Phase 2; supersede any that didn't survive contact with reality.
-- Decide versioning + distribution (`git+ssh` tag vs. private PyPI) before Phase 4.
-- Decide test Workspace ownership (separate domain vs. existing org subfolder) before Phase 2.
+- Decide versioning + distribution. **Captured in [ADR-0009](decisions/0009-versioning-and-distribution.md) (proposed).** Resolves before Phase 4 (or earlier — Phase 2B benefits if decided sooner).
+- Decide test Workspace ownership. **Captured in [ADR-0008](decisions/0008-test-workspace-ownership.md) (proposed).** **Blocks Phase 2B** (real Drive REST calls); does not block Phase 2A (protocol scaffolding + default `PrincipalStore`).
 
 ## Notes for whoever picks up the next session
 
