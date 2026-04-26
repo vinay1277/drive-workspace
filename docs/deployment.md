@@ -151,3 +151,46 @@ Estimated effort: 30 min once verification clears.
 | Date       | What rotated                        | Reason                                         |
 |------------|-------------------------------------|------------------------------------------------|
 | 2026-04-26 | Path B initial provision (no rotation; SA reused from existing project) | Drive workspace bootstrap blocked on Google account verification |
+
+---
+
+## Operational notes
+
+### 2026-04-26 — Docker Desktop installed; `docker compose up` verified
+
+Docker Desktop was previously deferred (see `plan.md` Phase 1 status — Phase 1
+verification ran via `flask run` directly). It is now installed on the dev
+box and the full compose stack boots clean:
+
+| Component                       | Status |
+|---------------------------------|--------|
+| `docker version` (client)       | 29.4.0 |
+| `docker compose version`        | v5.1.2 |
+| `postgres` container            | healthy on `:5432` |
+| `reference_server` container    | up on `:8080` |
+| `GET http://localhost:8080/health` | `{"status":"ok"}` |
+
+Install hiccup worth recording: a leftover `C:\ProgramData\DockerDesktop`
+directory from a previous partial install was owned by the regular user
+and the installer refused to proceed ("must be owned by an elevated
+account"). Fix was to `takeown /F /R /D Y` + `icacls /grant
+Administrators:(OI)(CI)F /T` + `rmdir /S /Q` from an elevated cmd, then
+re-run the installer. WSL2 backend; `--accept-license` non-interactive
+install.
+
+### Tags landed locally (not yet pushed — no remote configured)
+
+| Tag                     | Commit    | Meaning                                          |
+|-------------------------|-----------|--------------------------------------------------|
+| `phase-1-complete`      | `f2d5284` | Phase 1 skeleton + ADR-0008/9 + bug-fix merge    |
+| `phase-2a-complete`     | `9931cbc` | Phase 2A merge (protocols, FileAuth, stores, LogSchema) |
+| `adr-0010-applied`      | `c65b49c` | ADR-0010 implementation merge                    |
+| `path-b-bootstrapped`   | `0d67ec1` | This document — Path B deployment record         |
+
+### Open: no git remote yet
+
+`git remote -v` is empty. Tags and commits are local-only until a GitHub
+repo URL is provided and `git remote add origin <url> && git push -u
+origin main && git push origin --tags` runs. **Next session should
+either**: (a) create the GitHub repo and push, or (b) explicitly accept
+local-only as the steady state and remove this note.
