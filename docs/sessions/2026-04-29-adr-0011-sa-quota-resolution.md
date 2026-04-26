@@ -125,6 +125,32 @@ If hybrid: a mix of the above.
 
 ## Outcome
 
-> Filled in at end of session.
+ADR-0011 landed as `accepted`, choosing **Shared Drives** over DWD and
+Hybrid. Maintainer confirmed `meternnj-org` is on Business Standard+
+(Shared Drives available); on the DWD impersonation-target convention
+the maintainer delegated the call. Shared Drives won on three axes:
+smallest blast radius (one Shared Drive's contents vs DWD's
+org-wide-impersonation surface), zero library auth-code change
+(`FileAuthenticator` unmodified), and natural fit with ADR-0002
+(Shared Drive content is org-owned by definition).
 
-(blank — to be completed)
+No code changes this session. The Implementation notes carry forward:
+
+- New env var `DRIVE_WORKSPACE_SHARED_DRIVE_ID` (Phase 2B).
+- `DRIVE_WORKSPACE_ROOT_FOLDER_ID` redefined as a folder *inside* the
+  Shared Drive.
+- `supportsAllDrives=True` / `includeItemsFromAllDrives=True` flag
+  checklist for every Drive API call (enforcement: Phase 3 integration
+  tests).
+- SA membership role: Content Manager (not Manager).
+- Shared Drive external-sharing policy must allow non-org members so
+  per-principal view-only shares to personal Gmails keep working.
+
+`docs/deployment.md` updated: Path B §1 "Fixes" bullets replaced with a
+pointer to ADR-0011; Path A migration plan step 5/6 rewritten to name
+Shared Drive provisioning; new "2026-04-29 — Phase 2B prep" section in
+Operational notes captures the env vars, role, and code-change
+implications Phase 2B inherits.
+
+Commit: `fbb4a2c` — `docs(adr-0011): resolve SA storage-quota with a
+Shared Drive`. Pushed to `origin/main`.
