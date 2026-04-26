@@ -6,10 +6,12 @@ import com.driveworkspace.uploader.api.UploadError
 import com.driveworkspace.uploader.api.UploadInitiator
 import com.driveworkspace.uploader.api.UploadProgress
 import com.driveworkspace.uploader.api.UploadRequest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -46,7 +48,7 @@ internal class DriveUploaderImpl(
             initAttempt++
             emit(UploadProgress.Initiating(initAttempt))
             val session = try {
-                initiator.initiate(request)
+                withContext(Dispatchers.IO) { initiator.initiate(request) }
             } catch (t: Throwable) {
                 Timber.tag(TAG).w(t, "initiate failed")
                 emit(UploadProgress.Failed(UploadError.InitiateFailed(t), isRetryable = true))

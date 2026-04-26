@@ -98,7 +98,6 @@ Not started. Depends on v0.1.0. Out of scope until the maturity checklist is met
 ## Open work outside the phase plan
 
 - ADR review pass: read all ADRs after Phase 2; supersede any that didn't survive contact with reality.
-- Apply [ADR-0010](decisions/0010-library-dispatcher-discipline.md) (accepted): wrap `initiator.initiate(request)` in `withContext(Dispatchers.IO)` inside `DriveUploaderImpl.runUpload`; update `UploadInitiator` KDoc; remove the now-redundant wrap in `BackendInitiator.initiate()`; add a unit test asserting the initiator is invoked on a non-Main dispatcher. ~15 lines + tests. Should land in its own small session before any Phase 2B session that touches `DriveUploaderImpl`.
 - Phase 3 task seeded by ADR-0010: add an Android instrumentation test that exercises the full upload path with the flow collected on `Dispatchers.Main`. JVM-only unit tests cannot catch main-thread-network bugs; the gap was visible in Phase 1.
 
 ## Notes for whoever picks up the next session

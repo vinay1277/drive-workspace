@@ -11,6 +11,12 @@ package com.driveworkspace.uploader.api
  *  - Be idempotent against retries (callers may invoke this repeatedly when a
  *    session is reported expired).
  *  - Be safe to call from a background coroutine; do not assume a UI thread.
+ *
+ * **Threading**: the library invokes this method from `Dispatchers.IO`.
+ * Implementations may safely call blocking I/O directly (e.g. synchronous
+ * OkHttp). If the implementation needs a different dispatcher (e.g.
+ * `Dispatchers.Default` for CPU-bound work), use `withContext` inside the
+ * implementation; the library's outer dispatch becomes a no-op.
  */
 fun interface UploadInitiator {
     /**
