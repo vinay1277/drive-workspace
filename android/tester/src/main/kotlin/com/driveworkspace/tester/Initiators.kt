@@ -3,6 +3,8 @@ package com.driveworkspace.tester
 import com.driveworkspace.uploader.api.UploadInitiator
 import com.driveworkspace.uploader.api.UploadRequest
 import com.driveworkspace.uploader.api.UploadSession
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -38,30 +40,36 @@ class BackendInitiator(
     private val client: OkHttpClient = OkHttpClient(),
 ) : UploadInitiator {
 
-    override suspend fun initiate(request: UploadRequest): UploadSession {
-        val body = JSONObject().apply {
-            put("file_name", request.fileName)
-            put("mime_type", request.mimeType)
-            put("file_size_bytes", request.fileSizeBytes)
-            put("metadata", JSONObject(request.metadata))
-        }.toString()
+    // Synchronous OkHttp on the main thread = NetworkOnMainThreadException.
+    // The Flow runs on the collector's dispatcher (viewModelScope = Main), and
+    // initiate() is called directly from the flow body, so we must hop to IO
+    // ourselves. The Phase 2 ADR question — "should the library auto-dispatch
+    // initiator calls to IO?" — is open; until then, hosts handle this.
+    override suspend fun initiate(request: UploadRequest): UploadSession =
+        withContext(Dispatchers.IO) {
+            val body = JSONObject().apply {
+                put("file_name", request.fileName)
+                put("mime_type", request.mimeType)
+                put("file_size_bytes", request.fileSizeBytes)
+                put("metadata", JSONObject(request.metadata))
+            }.toString()
 
-        val req = Request.Builder()
-            .url(baseUrl.trimEnd('/') + "/api/drive/initiate-upload")
-            .header("X-Device-Token", deviceToken)
-            .header("Authorization", "Bearer $bearerToken")
-            .post(body.toRequestBody("application/json".toMediaType()))
-            .build()
+            val req = Request.Builder()
+                .url(baseUrl.trimEnd('/') + "/api/drive/initiate-upload")
+                .header("X-Device-Token", deviceToken)
+                .header("Authorization", "Bearer $bearerToken")
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .build()
 
-        return client.newCall(req).execute().use { resp ->
-            val text = resp.body?.string().orEmpty()
-            check(resp.isSuccessful) { "initiate-upload HTTP ${resp.code}: $text" }
-            val json = JSONObject(text)
-            UploadSession(
-                uploadUrl = json.getString("upload_url"),
-                remoteFileId = json.getString("drive_file_id"),
-                expiresAt = Instant.parse(json.getString("expires_at")),
-            )
+            client.newCall(req).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                check(resp.isSuccessful) { "initiate-upload HTTP ${resp.code}: $text" }
+                val json = JSONObject(text)
+                UploadSession(
+                    uploadUrl = json.getString("upload_url"),
+                    remoteFileId = json.getString("drive_file_id"),
+                    expiresAt = Instant.parse(json.getString("expires_at")),
+                )
+            }
         }
-    }
 }
