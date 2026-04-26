@@ -89,6 +89,62 @@ Do not read prior session transcripts.
 
 ## Outcome
 
-> Filled in at end of session.
+Reference server now has 21 pytest tests covering `/health`,
+`POST /api/drive/initiate-upload`, and the `PUT /_stub/upload/<id>`
+state machine end-to-end. Suite-wide totals: **38 passed, 1 skipped**
+(the existing postgres-only test). No production code changed.
 
-(blank — to be completed)
+**Coverage**
+
+`pytest --cov=reference_server backend/reference_server/tests/` →
+**100% on `reference_server/app.py`** (71/71 statements). The
+`threading.Lock` contention path is structurally exercised by every
+test that takes the lock; concurrent-access behaviour is out of scope
+per the brief.
+
+**Files added**
+
+- `backend/reference_server/tests/conftest.py` — single `client`
+  fixture per the existing `test_sqlalchemy_store.py` pattern. Each
+  test gets a freshly-built app so the in-memory `_sessions` dict
+  starts clean and tests cannot pollute each other.
+- `backend/reference_server/tests/test_health.py` — 2 tests (status,
+  idempotence).
+- `backend/reference_server/tests/test_stub_upload.py` — 8 tests for
+  the chunk-PUT state machine: 404 unknown, single-shot full PUT,
+  two-chunk 308→200, three-chunk cumulative `Range`, out-of-order
+  high-water-mark behaviour, post-completion 404, no-Content-Range
+  fallback, `bytes 0-N/*` total-unknown path.
+
+**Files modified**
+
+- `backend/reference_server/tests/test_initiate_upload.py` — already
+  existed (from the ADR-0003 prefetch session) and covered the
+  `?count` cap and validation. Augmented with the brief's missing
+  bullets: explicit `fake-` prefix assertion, host round-trip via
+  `Host:` header, two-consecutive-distinct-ids, no-body initiate
+  succeeds, negative-count rejected. Local `client` fixture removed
+  (now provided by `conftest.py`). Now 11 tests in this file.
+
+**Bugs found in `app.py`: zero**
+
+The out-of-order PUT path (`max(received, end+1)`) is permissive but
+intentional for the Phase 1 stub — `test_out_of_order_put_advances_high_water_mark`
+pins the behaviour explicitly with a comment so a future change is
+deliberate rather than accidental. No fix-in-separate-commit was
+needed.
+
+**Linters**
+
+- `ruff check .` from `backend/` — clean (one auto-fix applied for
+  import grouping).
+- `mypy --strict drive_workspace/` — clean (`Success: no issues found
+  in 18 source files`). Reference server stays out of the strict
+  scope per the brief's recommendation; revisit if test files get
+  gnarly.
+
+**Out of scope (unchanged from brief)**
+
+- Concurrency tests (threaded PUTs racing).
+- Tests against a real server subprocess (Phase 3.2).
+- Refactoring production code (no bugs surfaced anyway).
