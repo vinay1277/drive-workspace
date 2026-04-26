@@ -178,7 +178,10 @@ Administrators:(OI)(CI)F /T` + `rmdir /S /Q` from an elevated cmd, then
 re-run the installer. WSL2 backend; `--accept-license` non-interactive
 install.
 
-### Tags landed locally (not yet pushed — no remote configured)
+### Remote + tags pushed
+
+`origin` is `https://github.com/vinay1277/drive-workspace.git` (private).
+`main` and the four landmark tags below are pushed:
 
 | Tag                     | Commit    | Meaning                                          |
 |-------------------------|-----------|--------------------------------------------------|
@@ -186,11 +189,3 @@ install.
 | `phase-2a-complete`     | `9931cbc` | Phase 2A merge (protocols, FileAuth, stores, LogSchema) |
 | `adr-0010-applied`      | `c65b49c` | ADR-0010 implementation merge                    |
 | `path-b-bootstrapped`   | `0d67ec1` | This document — Path B deployment record         |
-
-### Open: no git remote yet
-
-`git remote -v` is empty. Tags and commits are local-only until a GitHub
-repo URL is provided and `git remote add origin <url> && git push -u
-origin main && git push origin --tags` runs. **Next session should
-either**: (a) create the GitHub repo and push, or (b) explicitly accept
-local-only as the steady state and remove this note.
