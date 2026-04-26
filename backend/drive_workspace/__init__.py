@@ -11,7 +11,15 @@ from drive_workspace.reconcile import ReconciliationRunner
 from drive_workspace.uploads import FileSpec, UploadSession, UploadSessionMint
 from drive_workspace.workspace import Authenticator, DriveWorkspace
 
+#: Hard cap on a single ``initiate-upload`` prefetch batch. Mirrors
+#: ``DriveUploader.MAX_PREFETCH_COUNT`` on the Android library side
+#: (see ADR-0003). Canonical home for both the package's Flask
+#: adapter and the reference server. Keeps an accidental
+#: ``?count=1000000`` from minting an unbounded batch.
+MAX_PREFETCH_COUNT: int = 50
+
 __all__ = [
+    "MAX_PREFETCH_COUNT",
     "Authenticator",
     "ColumnSpec",
     "DriveWorkspace",

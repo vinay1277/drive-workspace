@@ -36,10 +36,12 @@ Bearer …` on every request.
 
 `count` is the prefetch-batch size (per ADR-0003). The library passes
 `count=1` for the synchronous upload path and `count=N` for
-`DriveUploader.prefetchSessions(N, ...)`. The cap (`50`) matches
-`DriveUploader.MAX_PREFETCH_COUNT` on the library side; the server
-returns `400` for values outside the range, non-integers, or absent
-when expected.
+`DriveUploader.prefetchSessions(N, ...)`. The cap (`50`) lives at
+`drive_workspace.MAX_PREFETCH_COUNT` (the canonical home; the package
+Flask adapter and the reference server both import it from there) and
+mirrors `DriveUploader.MAX_PREFETCH_COUNT` on the Android library
+side. Servers return `400` for values outside the range, non-integers,
+or absent when expected.
 
 ### Request body
 

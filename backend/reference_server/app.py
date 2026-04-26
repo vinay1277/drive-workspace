@@ -19,6 +19,8 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
+from drive_workspace import MAX_PREFETCH_COUNT
+
 logger = logging.getLogger(__name__)
 
 # Per-upload byte-receipt tracking. In-memory because Phase 1 is a single
@@ -28,10 +30,7 @@ _sessions: dict[str, dict[str, Any]] = {}
 
 _RANGE_RE = re.compile(r"bytes\s+(\d+)-(\d+)/(\d+|\*)")
 
-#: Hard cap on a single prefetch batch. Mirrors
-#: ``DriveUploader.MAX_PREFETCH_COUNT`` on the library side. Keeps an
-#: accidental ``?count=1000000`` from minting an unbounded batch.
-MAX_PREFETCH_COUNT: int = 50
+__all__ = ["MAX_PREFETCH_COUNT", "app", "create_app"]
 
 
 def create_app() -> Flask:
