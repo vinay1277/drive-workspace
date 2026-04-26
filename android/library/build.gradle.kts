@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.driveworkspace.uploader"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26
@@ -63,5 +63,6 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.room.testing)
     testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.junit)
     testImplementation(libs.robolectric)
 }

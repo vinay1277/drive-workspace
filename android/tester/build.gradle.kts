@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.driveworkspace.tester"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.driveworkspace.tester"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }
@@ -23,6 +23,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions { jvmTarget = "17" }
@@ -55,4 +56,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.ui.tooling)
+
+    coreLibraryDesugaring(libs.android.desugar.jdk.libs)
 }
