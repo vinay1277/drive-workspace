@@ -40,6 +40,7 @@ data class TesterUiState(
 
     val mimeType: String = "application/octet-stream",
     val isUploading: Boolean = false,
+    val isPrefetching: Boolean = false,
     val progress: Float = 0f,
     val bytesUploaded: Long = 0,
     val bytesTotal: Long = 0,
@@ -107,6 +108,7 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
                 fileName = s.pickedFile.displayName,
                 mimeType = s.mimeType,
                 fileSizeBytes = file.length(),
+                kindHint = "tester-smoke",
                 metadata = mapOf("source" to "drive-tester"),
             )
             uploader.upload(file, req).collect { event ->
@@ -138,6 +140,48 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
         uploadJob?.cancel()
         _state.update { it.copy(isUploading = false) }
         appendLog("Cancelled.")
+    }
+
+    /**
+     * ADR-0003 manual smoke test. Mints [count] sessions ahead of time and
+     * stashes them in the library's local bank. Only useful in BACKEND
+     * mode — DIRECT mode's [ManualInitiator] rejects count != 1.
+     *
+     * The template UploadRequest uses the current MIME plus a 1-byte
+     * placeholder size; the resulting fingerprint covers the `<1MB`
+     * bracket which matches typical tester workflows (small synthesised
+     * payloads). Real-world fleets pick the bracket at prefetch time
+     * based on expected workload.
+     */
+    fun prefetchSessions(count: Int) {
+        val s = _state.value
+        if (s.mode != Mode.BACKEND) {
+            appendLog("Prefetch only works in Backend mode (ManualInitiator is single-URL).")
+            return
+        }
+        val initiator = buildInitiator(s) ?: return
+        _state.update { it.copy(isPrefetching = true) }
+        appendLog("→ prefetching $count sessions…")
+        viewModelScope.launch {
+            val uploader = DriveUploaderFactory.create(getApplication(), initiator)
+            val template = UploadRequest(
+                fileName = "prefetch-template",
+                mimeType = s.mimeType,
+                fileSizeBytes = 1L,
+                kindHint = "tester-smoke",
+                metadata = mapOf("source" to "drive-tester-prefetch"),
+            )
+            val banked = try {
+                uploader.prefetchSessions(count, template)
+            } catch (t: Throwable) {
+                Timber.tag(TAG).w(t, "prefetch failed")
+                appendLog("✗ prefetch threw: ${t.message}")
+                _state.update { it.copy(isPrefetching = false) }
+                return@launch
+            }
+            appendLog("✓ banked $banked / $count sessions")
+            _state.update { it.copy(isPrefetching = false) }
+        }
     }
 
     private fun buildInitiator(s: TesterUiState): UploadInitiator? = when (s.mode) {

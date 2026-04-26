@@ -135,6 +135,19 @@ private fun TesterScreen(vm: TesterViewModel) {
                 ) { Text("Cancel") }
             }
 
+            // ADR-0003 prefetch — backend-mode only. Manual smoke test:
+            //   1. tap "Prefetch 5 sessions" — bank fills.
+            //   2. toggle airplane mode (or kill the reference server).
+            //   3. tap "Upload" — the library draws from the bank and
+            //      uploads against the still-valid stub URL. No backend
+            //      round-trip on the upload path.
+            OutlinedButton(
+                onClick = { vm.prefetchSessions(5) },
+                enabled = state.mode == Mode.BACKEND &&
+                    !state.isUploading &&
+                    !state.isPrefetching,
+            ) { Text(if (state.isPrefetching) "Prefetching…" else "Prefetch 5 sessions") }
+
             state.pickedFile?.let { f ->
                 Text("File: ${f.displayName}  (${f.sizeBytes} bytes)",
                     style = MaterialTheme.typography.bodySmall)
