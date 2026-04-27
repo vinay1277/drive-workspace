@@ -70,7 +70,7 @@ verification (commits `35202e7`, `c03a4b1`). Full details in
 | 3.4a | Add `sphinx-build -b html -W` to `.github/workflows/backend-ci.yml` so docstring drift fails CI. | done (added in the post-queue cleanup; CI now installs the `docs` extra and runs `sphinx-build -W`) |
 | 3.5 | A second `LogSchema` impl (intentionally different shape) to validate the abstraction. | done (`InspectionLogSchema` fixture + 5 tests; intentionally asymmetric — composed/derived/formula cells, server-rendered `=NOW()`, hyperlink quote-escaping) |
 | 3.6 | One contract change exercised end-to-end (e.g. add a metadata field; touch backend, library, integration tests in one PR). | not started |
-| 3.7 | `docs/deployment.md` + `docs/integration-guide.md` complete. | not started |
+| 3.7 | `docs/deployment.md` + `docs/integration-guide.md` + `docs/troubleshooting.md` + `SUPPORT.md` complete. | partial (deployment.md current, troubleshooting.md and SUPPORT.md shipped as living docs; integration-guide.md still pending — best written after first real Phase 4 integration so it reflects actual practice) |
 | 3.8 | Tag `v0.1.0`. | not started |
 
 **Phase 3 exit criterion**: maturity checklist below passes.

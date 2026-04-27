@@ -17,8 +17,10 @@ device PUTs to directly. See [`docs/architecture.md`](docs/architecture.md).
 
 ## Status
 
-Pre-v0.1.0. Bootstrapped; no functional code yet. See
-[`docs/plan.md`](docs/plan.md) for phasing.
+Pre-v0.1.0. Phase 1 + Phase 2A complete; Phase 2B (real Drive) unblocked
+via Path B 2.0 (Workspace + Shared Drive operational). See
+[`docs/plan.md`](docs/plan.md) for phasing and
+[`docs/deployment.md`](docs/deployment.md) for the live test bed.
 
 ## Repo orientation
 
@@ -30,8 +32,12 @@ drive-workspace/
 ├── docs/
 │   ├── architecture.md      What we're building (start here)
 │   ├── plan.md              Phases, tasks, what's next
+│   ├── deployment.md        Live test-bed state (Workspace, Shared Drive, IDs)
+│   ├── troubleshooting.md   Concrete failures + fixes (search this when stuck)
+│   ├── operating-guide.md   How to work the repo, session by session
 │   ├── decisions/           ADRs — why we made each non-obvious choice
 │   └── sessions/            Per-session task briefs
+├── SUPPORT.md               How to get help / open issues
 ├── docker-compose.yml       Local dev stack
 └── README.md
 ```
@@ -48,6 +54,18 @@ drive-workspace/
 [`docs/operating-guide.md`](docs/operating-guide.md) is the practical guide
 for running this project session by session — how to start a session, what
 to watch for, how to verify done-ness, how to write briefs.
+
+## I'm a developer integrating this — where do I start?
+
+If you're looking to use `drive-workspace` from a host application
+rather than contribute to it:
+
+1. [`SUPPORT.md`](SUPPORT.md) — self-serve doc map + how to ask questions.
+2. [`docs/architecture.md`](docs/architecture.md) — the model (5 pages).
+3. [`integration-tests/smartmeter/`](integration-tests/smartmeter/) — a
+   working sketch of what host glue looks like (~80 lines).
+4. [`docs/troubleshooting.md`](docs/troubleshooting.md) — search here
+   when you hit an error.
 
 ## License
 
