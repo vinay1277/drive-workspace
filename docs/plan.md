@@ -65,10 +65,10 @@ verification (commits `35202e7`, `c03a4b1`). Full details in
 |---|------|--------|
 | 3.1 | `drive_workspace/tests/` — unit tests with `responses` mocking Drive/Sheets APIs. ≥85% line coverage on package code. | not started |
 | 3.2 | `integration-tests/` — at least three end-to-end tests: happy path, mid-stream disconnect, session expiry + re-init. Run against real test Drive in CI. | not started |
-| 3.3 | `mypy --strict` clean across `drive_workspace/`. | not started |
+| 3.3 | `mypy --strict` clean across `drive_workspace/`. | done (verified clean across 23 source files; CI enforces) |
 | 3.4 | API documentation: every public symbol has a docstring; `sphinx` build succeeds. | done (sphinx-build clean under `-W` already; see `2026-05-04-sphinx-docs`) |
-| 3.4a | Add `sphinx-build -b html -W` to `.github/workflows/backend-ci.yml` so docstring drift fails CI. Deferred from `2026-05-04-sphinx-docs` to keep that session scoped to the scaffold. | not started |
-| 3.5 | A second `LogSchema` impl (intentionally different shape) to validate the abstraction. | not started |
+| 3.4a | Add `sphinx-build -b html -W` to `.github/workflows/backend-ci.yml` so docstring drift fails CI. | done (added in the post-queue cleanup; CI now installs the `docs` extra and runs `sphinx-build -W`) |
+| 3.5 | A second `LogSchema` impl (intentionally different shape) to validate the abstraction. | done (`InspectionLogSchema` fixture + 5 tests; intentionally asymmetric — composed/derived/formula cells, server-rendered `=NOW()`, hyperlink quote-escaping) |
 | 3.6 | One contract change exercised end-to-end (e.g. add a metadata field; touch backend, library, integration tests in one PR). | not started |
 | 3.7 | `docs/deployment.md` + `docs/integration-guide.md` complete. | not started |
 | 3.8 | Tag `v0.1.0`. | not started |
@@ -77,12 +77,12 @@ verification (commits `35202e7`, `c03a4b1`). Full details in
 
 ### Maturity checklist (gate to integration)
 
-- [ ] End-to-end test: tester uploads 30 MB file 10× consecutively, with one forced disconnect and one forced 5xx in the run. All complete successfully.
-- [ ] Reconciliation CLI demonstrably cleans up an orphaned session.
-- [ ] Every public package symbol has a docstring; sphinx build succeeds.
-- [ ] Two distinct `LogSchema` implementations exist.
-- [ ] One contract change has shipped cleanly across both sides.
-- [ ] `mypy --strict` and `ruff` green in CI.
+- [ ] End-to-end test: tester uploads 30 MB file 10× consecutively, with one forced disconnect and one forced 5xx in the run. All complete successfully. *(blocked on Phase 2B → real Drive)*
+- [ ] Reconciliation CLI demonstrably cleans up an orphaned session. *(blocked on Phase 2B)*
+- [x] Every public package symbol has a docstring; sphinx build succeeds. *(`-W` clean; CI enforces)*
+- [x] Two distinct `LogSchema` implementations exist. *(`ExampleLogSchema`, `InspectionLogSchema`)*
+- [ ] One contract change has shipped cleanly across both sides. *(prefetch-bank already covers library + reference server; Drive side touched after Phase 2B)*
+- [x] `mypy --strict` and `ruff` green in CI.
 - [ ] `v0.1.0` tagged.
 
 ## Phase 4 — SmartMeter integration (later, separate work)
@@ -98,12 +98,12 @@ Not started. Depends on v0.1.0. Out of scope until the maturity checklist is met
 
 ## Open work outside the phase plan
 
-- ADR review pass: read all ADRs after Phase 2; supersede any that didn't survive contact with reality.
-- Phase 3 task seeded by ADR-0010: add an Android instrumentation test that exercises the full upload path with the flow collected on `Dispatchers.Main`. JVM-only unit tests cannot catch main-thread-network bugs; the gap was visible in Phase 1. **(Closed in `2026-05-01-instrumentation-test`; commit `f4ec286` ships the test, `43f3611` fixes the chunk-PUT response-handling bug it surfaced.)**
-- **Phase 2B prerequisite (seeded by `2026-05-03-smartmeter-integration-sketch`)**: ship `drive_workspace.adapters.flask.make_blueprint(dw, auth_decorator)` so hosts don't hand-wire the routes. **(Closed in `2026-05-05-phase2b-prereqs`; the SmartMeter sketch's host glue dropped ~57 lines after the swap.)**
-- **Phase 2B prerequisite (same brief)**: thread `shared_drive_id: str` through `DriveWorkspace.__init__` so ADR-0011's Shared-Drives choice has a constructor surface. **(Closed in `2026-05-05-phase2b-prereqs`; constructor validates non-empty, fail-fast.)**
-- **Phase 3 documentation task (same brief)**: per-host `TypedDict` for `LogSchema.render_row` payload. The contract is documented per host today (see `SmartMeterLogSchema` docstring) but not statically checked at the call site. A `TypedDict` declared by the host in their `LogSchema` module would give mypy something to verify — small change, no package-side work.
-- **Phase 4 nice-to-have (same brief)**: ship a `drive_workspace.migrations` helper module with the recommended `ALTER TABLE ... ADD COLUMN drive_*` SQL parameterised by table/PK type, so the second consumer doesn't re-derive it from the SmartMeter sketch.
+- ~~ADR review pass: read all ADRs after Phase 2; supersede any that didn't survive contact with reality.~~ **(Closed in post-queue cleanup; ADRs 0001-0011 reviewed: 0003 had its open question closed and an Implementation-status section added; 0008 got a Status note for Path B reality; 0010 got the chunk-PUT sibling-fix note. None superseded.)**
+- ~~Phase 3 task seeded by ADR-0010: add an Android instrumentation test that exercises the full upload path with the flow collected on `Dispatchers.Main`.~~ **(Closed in `2026-05-01-instrumentation-test`; commit `f4ec286` ships the test, `43f3611` fixes the chunk-PUT response-handling bug it surfaced — captured as ADR-0010's sibling-fix note.)**
+- ~~**Phase 2B prerequisite**: ship `drive_workspace.adapters.flask.make_blueprint(dw, auth_decorator)`.~~ **(Closed in `2026-05-05-phase2b-prereqs`.)**
+- ~~**Phase 2B prerequisite**: thread `shared_drive_id` through `DriveWorkspace.__init__`.~~ **(Closed in `2026-05-05-phase2b-prereqs`.)**
+- ~~**Phase 3 documentation task**: per-host `TypedDict` for `LogSchema.render_row` payload.~~ **(Closed in post-queue cleanup; pattern documented in `logs.py` Note section + `ExampleLogPayload` TypedDict shipped in `tests/_fixtures/example_log_schema.py`.)**
+- ~~**Phase 4 nice-to-have**: ship `drive_workspace.migrations` helper module.~~ **(Closed in post-queue cleanup; module shipped with 8 tests + sphinx coverage; `principal_columns_alter_sql(table, dialect, ...)` returns dialect-specific ALTER TABLE SQL for postgresql, mysql, sqlite. Now part of `__all__`.)**
 
 ## Notes for whoever picks up the next session
 

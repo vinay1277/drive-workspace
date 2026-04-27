@@ -76,3 +76,27 @@ SAs may share the same email or be separate; rotate either independently.
 Annual review (calendar reminder): confirm the SA still has only
 `drive.file` + `spreadsheets` scope and no shares outside the test root
 folder.
+
+## Status note (2026-04-26 → present)
+
+The intended target state described above is **not yet live**. Google
+holds the GCP project `drive-workspace-test-494511` (created under
+`meternnj-org`) in account verification review and will not enable
+APIs until that clears. To unblock smoke-testing of the package a
+temporary arrangement called **Path B** is in place: the existing
+`vision-ocr` SA from `gen-lang-client-0007734483` (a different,
+already-verified project) is reused, and a `drive-workspace-test`
+folder in `meternnj@gmail.com`'s personal Drive is shared with it.
+
+Path B is a documented deviation from this ADR. The Path A migration
+plan (re-aligning to ADR-0008's intended target state) is in
+`docs/deployment.md`. ADR-0008 is **not** superseded; it still
+describes the target state the project will return to once
+verification clears.
+
+Subsequent decision: ADR-0011 chose Shared Drives over DWD as the
+SA-storage-quota fix; the Path A migration when it happens will
+provision a Shared Drive inside the cleared project, not just a
+folder. Implementation notes here will need a small tweak at
+migration time (the SA's role becomes "Content Manager on the Shared
+Drive," not just "Editor on a folder"), captured in `deployment.md`.

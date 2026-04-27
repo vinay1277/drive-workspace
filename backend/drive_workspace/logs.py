@@ -68,6 +68,18 @@ class LogSchema(Protocol):
             A list of cell values aligned with ``columns()`` order.
             Cells may be primitives, formula strings (e.g.
             ``=HYPERLINK(...)``), or ``None``.
+
+        Note:
+            ``payload`` is typed as ``dict[str, Any]`` deliberately —
+            the package can't know what shape a given host's payload
+            takes. Hosts SHOULD declare a ``TypedDict`` in their own
+            ``LogSchema`` module and accept it at the call site, then
+            pass it to ``render_row`` (which mypy will narrow to
+            ``dict[str, Any]`` at the package boundary). This gives the
+            host static checking on every ``dw.logs.append(...)`` call
+            without coupling the package to host schemas. See
+            ``backend/drive_workspace/tests/_fixtures/example_log_schema.py``
+            for the pattern.
         """
         ...
 

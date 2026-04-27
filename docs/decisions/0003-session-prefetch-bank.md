@@ -65,12 +65,30 @@ Add a **session prefetch bank** to the Android library.
   cannot accidentally use the same session twice.
 - Tester app gains a "prefetch 5 sessions" button for manual validation.
 
-## Open question
+## Open question (closed 2026-04-30)
 
-How aggressive should the bank refill be? Two options:
+How aggressive should the bank refill be? Two options were considered:
 - **Lazy**: refill only when explicitly asked.
 - **Background**: when bank drops below threshold AND backend is reachable,
   refill in the background.
 
-Phase 2 ships **lazy** (simpler, host can wrap with their own scheduler).
-Reconsider if hosts request background-refill behavior.
+**Decided: lazy.** Host calls `prefetchSessions(...)` on its own
+schedule; library does no autonomous network. Reconsider if hosts
+request background-refill behavior. Shipped in commits `8a40f25` →
+`07e908c` per `docs/sessions/2026-04-30-prefetch-bank.md`.
+
+## Implementation status
+
+Shipped in 2026-04-30 across five commits. Notable deltas from the
+original spec:
+
+- `UploadInitiator.initiate` signature changed to
+  `suspend fun initiate(request, count: Int = 1): List<UploadSession>` —
+  prefetch is a single backend round-trip, not N sequential ones. This
+  is a pre-v0.1.0 breaking change to the host plug-point, accepted
+  because the pre-v0.1.0 surface is explicitly unstable per ADR-0009.
+- `UploadRequest.kindHint: String? = null` added as a typed slot for
+  the fingerprint instead of magic key in `metadata`. Hosts that don't
+  prefetch can ignore it.
+- `MAX_PREFETCH_COUNT = 50` cap exposed as a public constant; the
+  reference server enforces it server-side as well.

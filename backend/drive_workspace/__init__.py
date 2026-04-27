@@ -7,6 +7,7 @@ mirrors the architecture sketch; methods raise NotImplementedError.
 from drive_workspace.auth import FileAuthenticator
 from drive_workspace.folders import FolderManager
 from drive_workspace.logs import ColumnSpec, LogSchema, SpreadsheetLogger
+from drive_workspace.migrations import principal_columns_alter_sql
 from drive_workspace.reconcile import ReconciliationRunner
 from drive_workspace.uploads import FileSpec, UploadSession, UploadSessionMint
 from drive_workspace.workspace import Authenticator, DriveWorkspace
@@ -31,6 +32,7 @@ __all__ = [
     "SpreadsheetLogger",
     "UploadSession",
     "UploadSessionMint",
+    "principal_columns_alter_sql",
 ]
 
 __version__ = "0.0.1"

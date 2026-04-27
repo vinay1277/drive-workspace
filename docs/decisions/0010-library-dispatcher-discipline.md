@@ -132,3 +132,29 @@ tests):
 - Whether `prefetchSessions` (when added per ADR-0003) should also
   auto-dispatch. Yes — same reasoning. The session implementing
   prefetch follows this ADR's pattern.
+
+## Sibling fix — chunk-PUT response handling (added 2026-05-01)
+
+The S4 instrumentation test (`MainDispatcherInstrumentationTest`,
+`docs/sessions/2026-05-01-instrumentation-test.md`) caught a real bug
+that the original ADR's enumeration missed: `ResumableUploadEngine`'s
+chunk-PUT path switched to IO for the OkHttp `execute()` call, but the
+surrounding `.use { resp -> classifyChunkResponse(resp) }` block — and
+the implicit `Response.close()` `.use { }` performs at the end — ran
+on the *caller's* dispatcher (Main, in production). Both touch the
+response body (drain remaining socket bytes), tripping
+`StrictMode.detectNetwork().penaltyDeath()` on a 200 chunk response.
+
+This is the same defensive-dispatcher policy as the
+`UploadInitiator.initiate` decision above, applied to chunk-PUT
+response handling — strictly part of "all blocking work the library
+invokes runs on `Dispatchers.IO`." The fix is in commit `43f3611`:
+replace the `executeAsync(req)` helper with a block-taking variant
+that holds IO across the `Response`'s entire lifecycle (`execute()` →
+`classify` → `peekBody` → implicit close).
+
+This ADR's "Decision" stands as written; the scope was simply
+under-enumerated. Treat the chunk-PUT response handling as covered
+by this ADR going forward; if a future contributor adds a third
+network operation to the library, default it to `Dispatchers.IO` as
+well rather than re-litigating per call site.
