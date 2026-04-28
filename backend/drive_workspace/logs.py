@@ -98,13 +98,38 @@ class SpreadsheetLogger:
     def append(self, principal_id: str, row: dict[str, Any]) -> None:
         """Append one row to the principal's log spreadsheet.
 
-        Args:
-            principal_id: Stable identifier; must already be
-                provisioned (``get_spreadsheet_id`` non-None).
-            row: Payload passed straight through to the host's
-                ``LogSchema.render_row``.
+        Lazy-provisions the principal if missing — same defaults as
+        ``UploadSessionMint.initiate``. The provision call also writes
+        the spreadsheet header row from the host's
+        ``LogSchema.columns()``.
 
-        Raises:
-            NotImplementedError: Phase 1 stub.
+        Args:
+            principal_id: Stable identifier.
+            row: Payload passed to the host's ``LogSchema.render_row``.
         """
-        raise NotImplementedError("Phase 2B")
+        # Lazy-provision via the FolderManager so a fresh principal can
+        # log without a separate provision call.
+        self._dw.principals.provision_lazy(principal_id)
+        sheet_id = self._dw.principal_store.get_spreadsheet_id(principal_id)
+        if not sheet_id:
+            raise RuntimeError(
+                f"SpreadsheetLogger.append: principal {principal_id} has no spreadsheet "
+                f"after provision_lazy"
+            )
+
+        cells = self._dw.log_schema.render_row(row)
+
+        from googleapiclient.discovery import build  # noqa: PLC0415
+
+        sheets = build(
+            "sheets", "v4",
+            credentials=self._dw.auth.credential(),
+            cache_discovery=False,
+        )
+        sheets.spreadsheets().values().append(
+            spreadsheetId=sheet_id,
+            range="A1",
+            valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
+            body={"values": [cells]},
+        ).execute()
