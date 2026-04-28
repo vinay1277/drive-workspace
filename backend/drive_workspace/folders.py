@@ -133,7 +133,7 @@ class FolderManager:
                         permissionId=perm["id"],
                         supportsAllDrives=True,
                     ).execute()
-        except Exception:  # noqa: BLE001 — revoke is best-effort
+        except Exception:
             logger.warning(
                 "drive_workspace.revoke: best-effort permission cleanup failed for %s",
                 principal_id, exc_info=True,
@@ -166,7 +166,8 @@ class FolderManager:
         result = self._dw.principal_store.get_folder_id(principal_id)
         if not result:
             raise RuntimeError(
-                f"provision_lazy({principal_id}) completed but principal_store still has no folder_id"
+                f"provision_lazy({principal_id}) completed but principal_store "
+                f"still has no folder_id"
             )
         return result
 
@@ -175,11 +176,11 @@ class FolderManager:
     # ------------------------------------------------------------------
 
     def _drive(self) -> Any:
-        from googleapiclient.discovery import build  # noqa: PLC0415 — lazy
+        from googleapiclient.discovery import build
         return build("drive", "v3", credentials=self._dw.auth.credential(), cache_discovery=False)
 
     def _sheets(self) -> Any:
-        from googleapiclient.discovery import build  # noqa: PLC0415 — lazy
+        from googleapiclient.discovery import build
         return build("sheets", "v4", credentials=self._dw.auth.credential(), cache_discovery=False)
 
     def _create_folder(self, drive: Any, name: str, parent_id: str) -> str:
@@ -233,7 +234,7 @@ class FolderManager:
         # Write the header row from the host's LogSchema.
         try:
             specs = self._dw.log_schema.columns()
-        except Exception:  # noqa: BLE001 — header is best-effort
+        except Exception:
             specs = []
         if specs:
             header = [spec.header for spec in specs]
@@ -286,7 +287,7 @@ class FolderManager:
                 supportsAllDrives=True,
                 sendNotificationEmail=False,
             ).execute()
-        except Exception:  # noqa: BLE001 — share is best-effort
+        except Exception:
             logger.warning(
                 "drive_workspace._share_view: share to %s on %s failed",
                 email, file_id, exc_info=True,

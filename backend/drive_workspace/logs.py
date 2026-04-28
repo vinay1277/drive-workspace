@@ -119,7 +119,7 @@ class SpreadsheetLogger:
 
         cells = self._dw.log_schema.render_row(row)
 
-        from googleapiclient.discovery import build  # noqa: PLC0415
+        from googleapiclient.discovery import build
 
         sheets = build(
             "sheets", "v4",

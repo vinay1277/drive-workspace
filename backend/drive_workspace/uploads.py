@@ -29,7 +29,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -161,7 +161,7 @@ class UploadSessionMint:
         subsequent ``files.update`` with ``uploadType=resumable``
         attaches bytes via the resumable session URL.
         """
-        from googleapiclient.discovery import build  # noqa: PLC0415
+        from googleapiclient.discovery import build
 
         drive = build("drive", "v3", credentials=creds, cache_discovery=False)
         created = drive.files().create(
@@ -190,7 +190,7 @@ class UploadSessionMint:
         the SA bearer token is attached automatically and refreshed on
         the boundary.
         """
-        from google.auth.transport.requests import AuthorizedSession  # noqa: PLC0415
+        from google.auth.transport.requests import AuthorizedSession
 
         url = (
             f"https://www.googleapis.com/upload/drive/v3/files/{file_id}"
@@ -223,5 +223,5 @@ class UploadSessionMint:
 
 def _iso_expires_in_days(days: int) -> str:
     """Return an ISO-8601 UTC timestamp ``days`` from now."""
-    expiry = datetime.now(tz=timezone.utc) + timedelta(days=days)
+    expiry = datetime.now(tz=UTC) + timedelta(days=days)
     return expiry.strftime("%Y-%m-%dT%H:%M:%SZ")
