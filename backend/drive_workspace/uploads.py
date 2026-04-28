@@ -204,7 +204,10 @@ class UploadSessionMint:
             headers["X-Upload-Content-Length"] = str(spec.file_size_bytes)
 
         # Empty JSON body — we're only updating bytes, not metadata.
-        session = AuthorizedSession(creds)
+        # google-auth's AuthorizedSession lacks complete type stubs; the
+        # constructor is annotated as untyped. Suppress the strict-mypy
+        # complaint at the boundary.
+        session = AuthorizedSession(creds)  # type: ignore[no-untyped-call]
         response = session.patch(url, headers=headers, data=json.dumps({}))
 
         if response.status_code != 200:
